@@ -1,5 +1,26 @@
 #!/usr/bin/env perl
 
+=pod
+
+=head1 Copyright
+
+This file is part of twipper.
+
+twipper is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+twipper is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with twipper.  If not, see <http://www.gnu.org/licenses/>.
+
+=cut
+
 use warnings;
 use strict;
 
@@ -239,8 +260,10 @@ sub usage {
 	print( "If no flags are specified, the arguments will be joined with a space and posted to twitter.\n\n" );
 	print( "The first time it's run, the script will automatically guide the user through the prompts necessary to authorize the client to post and/or retrieve.\n\n" );
 	print( "NOTE: The OAuth protocol requires an accurate system clock. If your clock is too far off from Twitter's clock, authorization might fail, either consistently or intermittently. If you're having a problem like this, please try syncing your clock to an NTP server.\n\n" );
-	print( 'Report bugs to <pdbogen-twipper@cernu.us>', "\n" );
-	exit 0;
+	print( "Report bugs to <pdbogen-twipper\@cernu.us>\n" );
+	print( "twipper  Copyright (C) 2013 Patrick Bogen\n" );
+	print( "This program comes with ABSOLUTELY NO WARRANTY; see COPYING for details. This is free software, and you are welcome to redistribute it under certain conditions; see COPYING for details.\n" );
+exit 0;
 }
 
 sub fetch {

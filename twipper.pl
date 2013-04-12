@@ -24,6 +24,7 @@ along with twipper.  If not, see <http://www.gnu.org/licenses/>.
 use warnings;
 use strict;
 
+use Module::Load::Conditional qw( can_load );
 use Net::OAuth;
 $Net::OAuth::PROTOCOL_VERSION = Net::OAuth::PROTOCOL_VERSION_1_0A;
 use Digest::MD5 qw( md5_hex );
@@ -79,17 +80,20 @@ if( $fetch == 1 ) {
 #
 
 sub runWindowed {
-	use Tk;
-	my $rootWindow = MainWindow->new;
-	$rootWindow->title( "twipper.pl: tweet" );
-	$rootWindow->bind( "<Control-q>" => \&exit );
-	my $tweetEntry = $rootWindow->Entry( -textvariable => \$tweetVar, -validate => "all", -vcmd => \&validateFromGUI );
-	$tweetEntry->bind( "<Return>" => \&tweetFromGUI );
-	$tweetEntry->bind( "<Escape>" => \&clearFromGUI );
-	$tweetEntry->focus();
-	$tweetEntry->pack( -side => "left", -fill => "both", -expand => 1 );
-	$rootWindow->Label( -textvariable => \$tweetLabel )->pack;
-	MainLoop;
+	if( can_load( Modules => { "Tk" => undef } ) ) {
+		my $rootWindow = MainWindow->new;
+		$rootWindow->title( "twipper.pl: tweet" );
+		$rootWindow->bind( "<Control-q>" => \&exit );
+		my $tweetEntry = $rootWindow->Entry( -textvariable => \$tweetVar, -validate => "all", -vcmd => \&validateFromGUI );
+		$tweetEntry->bind( "<Return>" => \&tweetFromGUI );
+		$tweetEntry->bind( "<Escape>" => \&clearFromGUI );
+		$tweetEntry->focus();
+		$tweetEntry->pack( -side => "left", -fill => "both", -expand => 1 );
+		$rootWindow->Label( -textvariable => \$tweetLabel )->pack;
+		Tk::MainLoop();
+	} else {
+		die( "Undable to load perl Tk module. Please install the package (perl-tk on Debian) or module and try again." );
+	}
 }
 
 sub clearFromGUI {

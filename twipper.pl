@@ -46,6 +46,8 @@ my $count=5;
 my $stdin=0;
 my $window=0;
 my $blank=0;
+my $wrap=0;
+my $indent=0;
 
 GetOptions(
 	"count|c=i" => \$count,
@@ -53,7 +55,15 @@ GetOptions(
 	"stdin|s" => \$stdin,
 	"window|w" => \$window,
 	"blank|b" => \$blank,
+	"wrap=i"   => \$wrap,
+	"indent|i=i" => \$indent,
 ) or usage();
+
+if( $wrap != 0 ) {
+	unless( can_load( Modules => { "Text::Wrap" => undef } ) ) {
+		die( "wrapping (--wrap) requested but the Text::Wrap module is not available." );
+	}
+}
 
 if( $blank == 1 ) {
 	exit if `xscreensaver-command -time` =~ m/screen blanked/i;
@@ -252,6 +262,10 @@ sub usage {
 	print( "    -f, --fetch      Instead of updating Twitter, fetch your personal timeline\n" );
 	print( "    -c, --count      Specifies the number of tweets to fetch. The default is 5,\n" );
 	print( "                     if not specified.\n" );
+	print( "        --wrap       Specifies the number of columns to wrap to. See -i below if\n" );
+	print( "                     you'd like a hanging indent to keep things pretty.\n" );
+	print( "    -i, --indent     Only useful with --wrap, above, specifies the number of spaces\n" );
+	print( "                     to use in a hanging indent.\n" );
 	print( "    -s, --stdin      Read and post a tweet from stdin\n" );
 	print( "    -w, --window     Run in 'windowed' mode, which means a small window that\n" );
 	print( "                     lives forever and lets you post to Twitter.\n" );
@@ -303,24 +317,41 @@ sub fetch {
 	}
 	my $content = from_json( $response->content );
 	my @now = System_Clock(1);
+
+	my $namelen = 0;
+	for my $tweet (@$content) {
+		my $l = length $tweet->{ 'user' }->{ 'screen_name' };
+		$namelen = $l if( $l > $namelen );
+	}
+	$namelen += 2;
+	if( $indent == 0 ) {
+		$indent = 9 + $namelen;
+	}
+
 	for my $tweet (@$content) {
 		my @date = split( / /, $tweet->{ "created_at" } );
+		my $line = "";
 		@date = Delta_DHMS( $date[5], Decode_Month( $date[1] ), $date[2], split( /:/, $date[3] ), @now[0..5] );
 		if( $date[0] > 0 ) {
-			print( $date[0]."d" );
+			$line = sprintf( "%2dd", $date[0] );
 		} elsif( $date[1] > 0 ) {
-			print( $date[1]."h" );
+			$line = sprintf( "%2dh", $date[1] );
 		} elsif( $date[2] > 0 ) {
-			print( $date[2]."m" );
+			$line = sprintf( "%2dm", $date[2] );
 		} else {
-			print( $date[3]."s" );
+			$line = sprintf( "%2ds", $date[3] );
 		}
-		print( " ago, " );
-		print( $tweet->{ 'user' }->{ 'screen_name' }.": " );
+		$line .= ( " ago, " );
+		$line .= sprintf( "%".$namelen."s", $tweet->{ 'user' }->{ 'screen_name' }.": " );
 		$tweet->{ 'text' } =~ s/&lt;/</gi;
 		$tweet->{ 'text' } =~ s/&gt;/>/gi;
 		$tweet->{ 'text' } =~ s/\n/ /gs;
-		print( $tweet->{ 'text' }, "\n" );
+		$line .= ( $tweet->{ 'text' } . "\n" );
+		if( $wrap != 0 ) {
+			print( Text::Wrap::wrap( "", " " x $indent, $line ) );
+		} else {
+			print( $line );
+		}
 	}
 	exit 0;	
 }

@@ -90,7 +90,7 @@ if( $fetch == 1 ) {
 #
 
 sub runWindowed {
-	if( can_load( Modules => { "Tk" => undef } ) ) {
+	if( can_load( Modules => { "Tk" => undef, "Tk::Font" => undef } ) ) {
 		my $rootWindow = MainWindow->new;
 		$rootWindow->title( "twipper.pl: tweet" );
 		$rootWindow->bind( "<Control-q>" => \&exit );
@@ -99,7 +99,7 @@ sub runWindowed {
 		$tweetEntry->bind( "<Escape>" => \&clearFromGUI );
 		$tweetEntry->focus();
 		$tweetEntry->pack( -side => "left", -fill => "both", -expand => 1 );
-		$rootWindow->Label( -textvariable => \$tweetLabel )->pack;
+		$rootWindow->Label( -textvariable => \$tweetLabel, -font => $rootWindow->Font( -family => "Courier" ) )->pack;
 		Tk::MainLoop();
 	} else {
 		die( "Undable to load perl Tk module. Please install the package (perl-tk on Debian) or module and try again." );
@@ -113,7 +113,7 @@ sub clearFromGUI {
 sub validateFromGUI {
 	my $val = shift;
 	if( length( $val ) <= 140 ) {
-		$tweetLabel = "(".length( $val )."/140)";
+		$tweetLabel = sprintf( "(%3d/140)", length( $val ) );
 		return 1;
 	}
 	return 0;

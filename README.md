@@ -3,6 +3,15 @@ twipper
 
 A small perl-based CLI twitter client; works well with conky integration for reading, at least for my purposes.
 
+Requirements
+=======
+Net::OAuth (libnet-oauth-perl)
+LWP (libwww-perl)
+JSON (libjson-perl)
+
+And, if you want to use the GUI mode,
+Tk (perl-tk)
+
 LICENSE
 =======
 Copyright 2013 Patrick Bogen

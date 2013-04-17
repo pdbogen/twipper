@@ -93,17 +93,24 @@ sub runWindowed {
 	if( can_load( Modules => { "Tk" => undef, "Tk::Font" => undef } ) ) {
 		my $rootWindow = MainWindow->new;
 		$rootWindow->title( "twipper.pl: tweet" );
-		$rootWindow->bind( "<Control-q>" => \&exit );
+		$rootWindow->bind( "<Control-q>" => [ sub { exit(0); } ] );
 		my $tweetEntry = $rootWindow->Entry( -textvariable => \$tweetVar, -validate => "all", -vcmd => \&validateFromGUI );
 		$tweetEntry->bind( "<Return>" => \&tweetFromGUI );
 		$tweetEntry->bind( "<Escape>" => \&clearFromGUI );
 		$tweetEntry->focus();
-		$tweetEntry->pack( -side => "left", -fill => "both", -expand => 1 );
-		$rootWindow->Label( -textvariable => \$tweetLabel, -font => $rootWindow->Font( -family => "Courier" ) )->pack;
+		$tweetEntry->place( -anchor => "nw", -x => 0, -y => 0 ); #pack( -side => "left", -fill => "both", -expand => 0 );
+		my $label = $rootWindow->Label( -textvariable => \$tweetLabel );#, -font => $rootWindow->Font( -family => "Courier" ) );
+		$label->place( -anchor => "ne", -relx => 1.0, -rely => 0.0 ); #pack( -fill => "both", -expand => 0 );
+		$rootWindow->bind( "<Configure>" => [ \&resizeGUI, $rootWindow, $tweetEntry, $label ] );
 		Tk::MainLoop();
 	} else {
 		die( "Undable to load perl Tk module. Please install the package (perl-tk on Debian) or module and try again." );
 	}
+}
+
+sub resizeGUI {
+	my( $ign, $root, $tweet, $label ) = @_;
+	$tweet->place( -width => ($root->width - $label->width) );
 }
 
 sub clearFromGUI {
@@ -113,7 +120,7 @@ sub clearFromGUI {
 sub validateFromGUI {
 	my $val = shift;
 	if( length( $val ) <= 140 ) {
-		$tweetLabel = sprintf( "(%3d/140)", length( $val ) );
+		$tweetLabel = sprintf( "(%d/140)", length( $val ) );
 		return 1;
 	}
 	return 0;

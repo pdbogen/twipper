@@ -267,11 +267,11 @@ sub tweet {
 sub usage {
 	print( "Usage: $0 [-f] [-c <count>] [-w] [<tweet>]\n\n" );
 	print( "    -f, --fetch      Instead of updating Twitter, fetch your personal timeline\n" );
-	print( "    -c, --count      Specifies the number of tweets to fetch. The default is 5,\n" );
+	print( "    -c, --count <#>  Specifies the number of tweets to fetch. The default is 5,\n" );
 	print( "                     if not specified.\n" );
-	print( "        --wrap       Specifies the number of columns to wrap to. See -i below if\n" );
+	print( "        --wrap <#>   Specifies the number of columns to wrap to. See -i below if\n" );
 	print( "                     you'd like a hanging indent to keep things pretty.\n" );
-	print( "    -i, --indent     Only useful with --wrap, above, specifies the number of spaces\n" );
+	print( "    -i, --indent <#> Only useful with --wrap, above, specifies the number of spaces\n" );
 	print( "                     to use in a hanging indent.\n" );
 	print( "    -s, --stdin      Read and post a tweet from stdin\n" );
 	print( "    -w, --window     Run in 'windowed' mode, which means a small window that\n" );

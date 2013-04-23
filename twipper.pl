@@ -76,6 +76,7 @@ if( $wrap != 0 ) {
 
 if( $blank == 1 ) {
 	exit if `xscreensaver-command -time` =~ m/screen blanked/i;
+	exit if `xset q` =~ m/Monitor is Off/i;
 }
 
 my $userAgent = LWP::UserAgent->new();

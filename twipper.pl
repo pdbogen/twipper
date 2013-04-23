@@ -48,6 +48,7 @@ my $window=0;
 my $blank=0;
 my $wrap=0;
 my $indent=0;
+my $twoline=0;
 
 GetOptions(
 	"count|c=i" => \$count,
@@ -57,12 +58,20 @@ GetOptions(
 	"blank|b" => \$blank,
 	"wrap=i"   => \$wrap,
 	"indent|i=i" => \$indent,
+	"twoline|t" => \$twoline,
 ) or usage();
 
+if( $twoline && $wrap==0 ) {
+	warn( "--twoline requires setting a wrap length with --wrap" );
+	usage();
+	exit 1;
+}
 if( $wrap != 0 ) {
 	unless( can_load( Modules => { "Text::Wrap" => undef } ) ) {
 		die( "wrapping (--wrap) requested but the Text::Wrap module is not available." );
 	}
+	$Text::Wrap::columns = $wrap;
+	$Text::Wrap::columns = $wrap;
 }
 
 if( $blank == 1 ) {
@@ -273,6 +282,10 @@ sub usage {
 	print( "                     you'd like a hanging indent to keep things pretty.\n" );
 	print( "    -i, --indent <#> Only useful with --wrap, above, specifies the number of spaces\n" );
 	print( "                     to use in a hanging indent.\n" );
+	print( "        --twoline    Use a special two-line (multi-line, really) mode. This must be\n" );
+	print( "                     combined with --wrap. Tweets will be displayed in a neat\n" );
+	print( "                     column. The left will show the username and the time delta\n" );
+	print( "                     and the right will show the actual tweet. Huzzah!\n" );
 	print( "    -s, --stdin      Read and post a tweet from stdin\n" );
 	print( "    -w, --window     Run in 'windowed' mode, which means a small window that\n" );
 	print( "                     lives forever and lets you post to Twitter.\n" );
@@ -330,7 +343,13 @@ sub fetch {
 		my $l = length $tweet->{ 'user' }->{ 'screen_name' };
 		$namelen = $l if( $l > $namelen );
 	}
-	$namelen += 2;
+	$namelen += 2; # Two for the ": " that follows names
+
+	if( $twoline ) {
+		die( "names are too long, can't continue in twoline mode with this wrap size! ($namelen >= $wrap)" ) if $namelen >= $wrap;
+		$Text::Wrap::columns = ( $wrap - $namelen );
+	}
+
 	if( $indent == 0 ) {
 		$indent = 9 + $namelen;
 	}
@@ -338,26 +357,35 @@ sub fetch {
 	for my $tweet (@$content) {
 		my @date = split( / /, $tweet->{ "created_at" } );
 		my $line = "";
+		my $delta;
 		@date = Delta_DHMS( $date[5], Decode_Month( $date[1] ), $date[2], split( /:/, $date[3] ), @now[0..5] );
 		if( $date[0] > 0 ) {
-			$line = sprintf( "%2dd", $date[0] );
+			$delta = sprintf( "%2dd", $date[0] );
 		} elsif( $date[1] > 0 ) {
-			$line = sprintf( "%2dh", $date[1] );
+			$delta = sprintf( "%2dh", $date[1] );
 		} elsif( $date[2] > 0 ) {
-			$line = sprintf( "%2dm", $date[2] );
+			$delta = sprintf( "%2dm", $date[2] );
 		} else {
-			$line = sprintf( "%2ds", $date[3] );
+			$delta = sprintf( "%2ds", $date[3] );
 		}
-		$line .= ( " ago, " );
-		$line .= sprintf( "%".$namelen."s", $tweet->{ 'user' }->{ 'screen_name' }.": " );
 		$tweet->{ 'text' } =~ s/&lt;/</gi;
 		$tweet->{ 'text' } =~ s/&gt;/>/gi;
 		$tweet->{ 'text' } =~ s/\n/ /gs;
-		$line .= ( $tweet->{ 'text' } . "\n" );
-		if( $wrap != 0 ) {
-			print( Text::Wrap::wrap( "", " " x $indent, $line ) );
+		if( $twoline ) {
+			my @lines = split( /\n/s, Text::Wrap::wrap( "", "", $tweet->{ 'text' } ) );
+			printf( "%".$namelen."s%s\n", $tweet->{ 'user' }->{ 'screen_name' }.": ", shift @lines );
+			printf( "%".($namelen-1)."s %s\n", $delta." ago", ($lines[0]?shift @lines:"") );
+			for my $line( @lines ) {
+				print( (" "x$namelen)."$line\n" );
+			}
+			print( "\n" );
 		} else {
-			print( $line );
+			$line = sprintf( "$delta ago, %".$namelen."s%s\n", $tweet->{ 'user' }->{ 'screen_name' }.": ", $tweet->{ 'text' } );
+			if( $wrap != 0 ) {
+				print( Text::Wrap::wrap( "", " " x $indent, $line ) );
+			} else {
+				print( $line );
+			}
 		}
 	}
 	exit 0;	

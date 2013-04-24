@@ -49,6 +49,7 @@ my $blank=0;
 my $wrap=0;
 my $indent=0;
 my $twoline=0;
+my $drawlines=0;
 
 GetOptions(
 	"count|c=i" => \$count,
@@ -59,6 +60,7 @@ GetOptions(
 	"wrap=i"   => \$wrap,
 	"indent|i=i" => \$indent,
 	"twoline|t" => \$twoline,
+	"drawlines" => \$drawlines,
 ) or usage();
 
 if( $twoline && $wrap==0 ) {
@@ -66,6 +68,11 @@ if( $twoline && $wrap==0 ) {
 	usage();
 	exit 1;
 }
+
+if( $drawlines && !$twoline ) {
+	warn( "--drawline is meaningless without --twoline" );
+}
+
 if( $wrap != 0 ) {
 	unless( can_load( Modules => { "Text::Wrap" => undef } ) ) {
 		die( "wrapping (--wrap) requested but the Text::Wrap module is not available." );
@@ -355,6 +362,13 @@ sub fetch {
 		$indent = 9 + $namelen;
 	}
 
+	
+	my( $hsep, $vsep, $isect ) = ( " ", " ", " " );
+	if( $drawlines ) {
+		$hsep = "-"; $vsep = "|"; $isect = "+";
+	}
+	print( ($hsep)x($namelen-2).$isect.($hsep)x($wrap-$namelen+1)."\n" ) if $drawlines;
+
 	for my $tweet (@$content) {
 		my @date = split( / /, $tweet->{ "created_at" } );
 		my $line = "";
@@ -374,12 +388,12 @@ sub fetch {
 		$tweet->{ 'text' } =~ s/\n/ /gs;
 		if( $twoline ) {
 			my @lines = split( /\n/s, Text::Wrap::wrap( "", "", $tweet->{ 'text' } ) );
-			printf( "%".$namelen."s%s\n", $tweet->{ 'user' }->{ 'screen_name' }.": ", shift @lines );
-			printf( "%".($namelen-1)."s %s\n", $delta." ago", ($lines[0]?shift @lines:"") );
+			printf( "%".($namelen-1)."s%s\n", $tweet->{ 'user' }->{ 'screen_name' }.$vsep, shift @lines );
+			printf( "%".($namelen-2)."s".$vsep."%s\n", $delta." ago", ($lines[0]?shift @lines:"") );
 			for my $line( @lines ) {
-				print( (" "x$namelen)."$line\n" );
+				print( " "x($namelen-2).$vsep."$line\n" );
 			}
-			print( "\n" );
+			print( ($hsep)x($namelen-2).$isect.($hsep)x($wrap-$namelen+1)."\n" );
 		} else {
 			$line = sprintf( "$delta ago, %".$namelen."s%s\n", $tweet->{ 'user' }->{ 'screen_name' }.": ", $tweet->{ 'text' } );
 			if( $wrap != 0 ) {

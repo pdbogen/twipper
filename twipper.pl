@@ -27,7 +27,7 @@ use strict;
 use Module::Load::Conditional qw( can_load );
 use Net::OAuth;
 $Net::OAuth::PROTOCOL_VERSION = Net::OAuth::PROTOCOL_VERSION_1_0A;
-use Digest::MD5 qw( md5_hex );
+use Digest::SHA qw( sha256_hex );
 use HTTP::Request::Common;
 use LWP::UserAgent;
 use Storable;
@@ -35,6 +35,7 @@ use Getopt::Long;
 use Data::Dumper;
 use JSON;
 use Date::Calc qw(System_Clock Decode_Month Delta_DHMS);
+use Math::Random::Secure qw(rand);
 
 binmode STDOUT, ":utf8";
 
@@ -50,6 +51,9 @@ my $wrap=0;
 my $indent=0;
 my $twoline=0;
 my $drawlines=0;
+my $dryrun=0;
+my $shortenLengthHttp=-1;
+my $shortenLengthHttps=-1;
 
 GetOptions(
 	"count|c=i" => \$count,
@@ -61,6 +65,7 @@ GetOptions(
 	"indent|i=i" => \$indent,
 	"twoline|t" => \$twoline,
 	"drawlines" => \$drawlines,
+	"dry-run|n" => \$dryrun,
 ) or usage();
 
 if( $twoline && $wrap==0 ) {
@@ -87,7 +92,6 @@ if( $blank == 1 ) {
 }
 
 my $userAgent = LWP::UserAgent->new();
-my $nonce = md5_hex( time.rand );
 
 my( $token, $token_secret ) = getAuth();
 
@@ -114,6 +118,8 @@ sub runWindowed {
 		my $tweetEntry = $rootWindow->Entry( -textvariable => \$tweetVar, -validate => "all", -vcmd => \&validateFromGUI );
 		$tweetEntry->bind( "<Return>" => \&tweetFromGUI );
 		$tweetEntry->bind( "<Escape>" => \&clearFromGUI );
+		$tweetEntry->after( 1000, \&updateConfigInfo );
+		$tweetEntry->after( 3600000, \&updateConfigInfo );
 		$tweetEntry->focus();
 		$tweetEntry->place( -anchor => "nw", -x => 0, -y => 0 ); #pack( -side => "left", -fill => "both", -expand => 0 );
 		my $label = $rootWindow->Label( -textvariable => \$tweetLabel );#, -font => $rootWindow->Font( -family => "Courier" ) );
@@ -122,6 +128,31 @@ sub runWindowed {
 		Tk::MainLoop();
 	} else {
 		die( "Undable to load perl Tk module. Please install the package (perl-tk on Debian) or module and try again." );
+	}
+}
+
+sub updateConfigInfo {
+	my $oaRequest = Net::OAuth->request( "protected resource" )->new(
+		consumer_key     => $consumer_key,
+		consumer_secret  => $consumer_secret,
+		request_url      => 'https://api.twitter.com/1.1/help/configuration.json',
+		request_method   => 'GET',
+		signature_method => 'HMAC-SHA1',
+		timestamp        => time,
+		nonce            => sha256_hex( rand ),
+		token            => $token,
+		token_secret     => $token_secret,
+		);
+	$oaRequest->sign();
+	my $response = $userAgent->request( GET $oaRequest->to_url() );
+	if( !$response->is_success() ) {
+		print( STDERR "TWITTER: Error: ".$response->status_line(), "\n" );
+		print( STDERR "TWITTER: URL was '".$oaRequest->to_url()."'\n" );
+		die( "Failed to retrieve configuration information from twitter; cannot discern the shortened length of URLs. URLs will not be handled specially." );
+	} else {
+		my $response_data = decode_json $response->content();
+		$shortenLengthHttp = $response_data->{ "short_url_length" };
+		$shortenLengthHttps = $response_data->{ "short_url_length_https" };
 	}
 }
 
@@ -135,12 +166,30 @@ sub clearFromGUI {
 }
 
 sub validateFromGUI {
-	my $val = shift;
-	if( length( $val ) <= 140 ) {
-		$tweetLabel = sprintf( "(%d/140)", length( $val ) );
+	my $len = calculateLength( shift, 0 );
+	if( $len <= 140 ) {
+		$tweetLabel = sprintf( "(%d/140)", $len );
 		return 1;
 	}
 	return 0;
+}
+
+sub calculateLength {
+	my $val = shift;
+	my $block = shift;
+	my $len = length $val;
+	if( ( $shortenLengthHttp == -1 || $shortenLengthHttps == -1 ) && $block ) {
+		updateConfigInfo();
+	}
+	if( $shortenLengthHttp != -1 && $shortenLengthHttps != -1 ) {
+		my $url_munged_what = $val;
+		my $http_placeholder = "x"x$shortenLengthHttp;
+		my $https_placeholder = "x"x$shortenLengthHttps;
+		$url_munged_what =~ s/http:\/\/[^\s]+/$http_placeholder/g;
+		$url_munged_what =~ s/https:\/\/[^\s]+/$https_placeholder/g;
+		$len = length $url_munged_what;
+	}
+	return $len;
 }
 
 sub tweetFromGUI {
@@ -169,7 +218,7 @@ sub getAuth {
 			request_method   => 'POST',
 			signature_method => 'HMAC-SHA1',
 			timestamp        => time,
-			nonce            => $nonce,
+			nonce            => sha256_hex( rand ),
 			callback         => "oob"
 		);
 	
@@ -200,7 +249,7 @@ sub getAuth {
 			request_method   => 'POST',
 			signature_method => 'HMAC-SHA1',
 			timestamp        => time,
-			nonce            => $nonce,
+			nonce            => sha256_hex( rand ),
 			token            => $token,
 			token_secret     => $token_secret,
 			verifier         => $response,
@@ -245,7 +294,8 @@ sub tweet {
 		}
 	}
 	
-	my $len = length $status;
+	# Calculate length, retrieving the config info in blocking mode if necessary
+	my $len = calculateLength( $status, 1 );
 	if( $len > 140 ) {
 		print( STDERR "Oops! The tweet may not exceed the 140-character limit. You went over by ".($len - 140), "\n" );
 		return 1;
@@ -258,7 +308,7 @@ sub tweet {
 		request_method   => 'POST',
 		signature_method => 'HMAC-SHA1',
 		timestamp        => time,
-		nonce            => $nonce,
+		nonce            => sha256_hex( rand ),
 		token            => $token,
 		token_secret     => $token_secret,
 		extra_params => {
@@ -268,14 +318,19 @@ sub tweet {
 
 	$oaRequest->sign();
 
-	my $response = $userAgent->request( POST $oaRequest->to_url() );
-	if( !$response->is_success() ) {
-		warn( "Something bad happened: ".$response->status_line() );
-		if( $response->code == "401" ) {
-			warn( "More specifically, it was a 401- this usually means $0 was de-authorized." );
-			print( STDERR "If you think this might be the case, please try deleting ".<~/.twipper.secret>." and running me again.\n" );
-		}
+	if( $dryrun ) {
+		print( "Not actually tweeting.\n" );
 		return 1;
+	} else {
+		my $response = $userAgent->request( POST $oaRequest->to_url() );
+		if( !$response->is_success() ) {
+			warn( "Something bad happened: ".$response->status_line() );
+			if( $response->code == "401" ) {
+				warn( "More specifically, it was a 401- this usually means $0 was de-authorized." );
+				print( STDERR "If you think this might be the case, please try deleting ".<~/.twipper.secret>." and running me again.\n" );
+			}
+			return 1;
+		}
 	}
 
 	return 0;
@@ -302,14 +357,16 @@ sub usage {
 	print( "                     per account. If this script is run from conky on multiple\n" );
 	print( "                     systems, it becomes much easier to reach this limit. This\n" );
 	print( "                     option will prevent the script from running when,\n" );
-	print( "                     assumably, the user is away from his or her terminal.\n\n" );
+	print( "                     assumably, the user is away from his or her terminal.\n" );
+	print( "    -n, --dry-run    Don't actually tweet, or whatever. Do everything up until\n" );
+	print( "                     that point.\n\n" );
 	print( "If no flags are specified, the arguments will be joined with a space and posted to twitter.\n\n" );
 	print( "The first time it's run, the script will automatically guide the user through the prompts necessary to authorize the client to post and/or retrieve.\n\n" );
 	print( "NOTE: The OAuth protocol requires an accurate system clock. If your clock is too far off from Twitter's clock, authorization might fail, either consistently or intermittently. If you're having a problem like this, please try syncing your clock to an NTP server.\n\n" );
 	print( "Report bugs to <pdbogen-twipper\@cernu.us>\n" );
 	print( "twipper  Copyright (C) 2013 Patrick Bogen\n" );
 	print( "This program comes with ABSOLUTELY NO WARRANTY; see COPYING for details. This is free software, and you are welcome to redistribute it under certain conditions; see COPYING for details.\n" );
-exit 0;
+	exit 0;
 }
 
 sub fetch {
@@ -324,7 +381,7 @@ sub fetch {
 		request_method   => 'GET',
 		signature_method => 'HMAC-SHA1',
 		timestamp        => time,
-		nonce            => $nonce,
+		nonce            => sha256_hex( rand ),
 		token            => $token,
 		token_secret     => $token_secret
 	);

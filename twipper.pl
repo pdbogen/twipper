@@ -111,24 +111,30 @@ if( $fetch == 1 ) {
 #
 
 sub runWindowed {
-	if( can_load( Modules => { "Tk" => undef, "Tk::Font" => undef } ) ) {
-		my $rootWindow = MainWindow->new;
-		$rootWindow->title( "twipper.pl: tweet" );
-		$rootWindow->bind( "<Control-q>" => [ sub { exit(0); } ] );
-		my $tweetEntry = $rootWindow->Entry( -textvariable => \$tweetVar, -validate => "all", -vcmd => \&validateFromGUI );
-		$tweetEntry->bind( "<Return>" => \&tweetFromGUI );
-		$tweetEntry->bind( "<Escape>" => \&clearFromGUI );
-		$tweetEntry->after( 1000, \&updateConfigInfo );
-		$tweetEntry->after( 3600000, \&updateConfigInfo );
-		$tweetEntry->focus();
-		$tweetEntry->place( -anchor => "nw", -x => 0, -y => 0 ); #pack( -side => "left", -fill => "both", -expand => 0 );
-		my $label = $rootWindow->Label( -textvariable => \$tweetLabel );#, -font => $rootWindow->Font( -family => "Courier" ) );
-		$label->place( -anchor => "ne", -relx => 1.0, -rely => 0.0 ); #pack( -fill => "both", -expand => 0 );
-		$rootWindow->bind( "<Configure>" => [ \&resizeGUI, $rootWindow, $tweetEntry, $label ] );
-		Tk::MainLoop();
-	} else {
-		die( "Undable to load perl Tk module. Please install the package (perl-tk on Debian) or module and try again." );
+	unless( can_load( Modules => { "Tk" => undef } ) ) {
+		die( "Undable to load perl Tk module. Please install the package (perl-tk on Debian) or module and try again:\n".$Module::Load::Conditional::ERROR );
 	}
+
+	my $rootWindow = MainWindow->new;
+	$rootWindow->title( "twipper.pl: tweet" );
+	$rootWindow->bind( "<Control-q>" => [ sub { exit(0); } ] );
+	my $tweetEntry = $rootWindow->Entry( -textvariable => \$tweetVar, -validate => "all", -vcmd => \&validateFromGUI, -font => $rootWindow->fontCreate( "entryFont" ) );
+	$tweetEntry->bind( "<Return>" => \&tweetFromGUI );
+	$tweetEntry->bind( "<Escape>" => \&clearFromGUI );
+	$tweetEntry->after( 1000, \&updateConfigInfo );
+	$tweetEntry->after( 3600000, \&updateConfigInfo );
+	$tweetEntry->focus();
+	$tweetEntry->place( -anchor => "nw", -x => 0, -y => 0 ); #pack( -side => "left", -fill => "both", -expand => 0 );
+	my $label = $rootWindow->Label( -textvariable => \$tweetLabel, -font => $rootWindow->fontCreate( "labelFont" ) );#, -font => $rootWindow->Font( -family => "Courier" ) );
+	$label->place( -anchor => "ne", -relx => 1.0, -rely => 0.0 ); #pack( -fill => "both", -expand => 0 );
+	$rootWindow->bind( "<Configure>" => [ sub {
+		my( $ign, $root, $tweetEntry, $label ) = @_;
+		print( $root->height, "\n" );
+		$label->font( "configure", "labelFont", "-size", -1 * ( $root->height - 8 ) );
+		$tweetEntry->font( "configure", "entryFont", "-size", -1 * ( $root->height - 13 ) );
+		$tweetEntry->place( -width => ($root->width - $label->Width) );
+	}, $rootWindow, $tweetEntry, $label ] );
+	Tk::MainLoop();
 }
 
 sub updateConfigInfo {
@@ -154,11 +160,6 @@ sub updateConfigInfo {
 		$shortenLengthHttp = $response_data->{ "short_url_length" };
 		$shortenLengthHttps = $response_data->{ "short_url_length_https" };
 	}
-}
-
-sub resizeGUI {
-	my( $ign, $root, $tweet, $label ) = @_;
-	$tweet->place( -width => ($root->width - $label->width) );
 }
 
 sub clearFromGUI {

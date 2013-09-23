@@ -129,7 +129,6 @@ sub runWindowed {
 	$label->place( -anchor => "ne", -relx => 1.0, -rely => 0.0 ); #pack( -fill => "both", -expand => 0 );
 	$rootWindow->bind( "<Configure>" => [ sub {
 		my( $ign, $root, $tweetEntry, $label ) = @_;
-		print( $root->height, "\n" );
 		$label->font( "configure", "labelFont", "-size", -1 * ( $root->height - 8 ) );
 		$tweetEntry->font( "configure", "entryFont", "-size", -1 * ( $root->height - 13 ) );
 		$tweetEntry->place( -width => ($root->width - $label->Width) );
@@ -194,8 +193,10 @@ sub calculateLength {
 }
 
 sub tweetFromGUI {
-	tweet( $tweetVar );
-	$tweetVar = "";
+	if( length( $tweetVar ) > 0 ) {
+		tweet( $tweetVar );
+		$tweetVar = "";
+	}
 }
 
 sub getAuth {

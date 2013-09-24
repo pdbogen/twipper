@@ -444,6 +444,7 @@ sub fetch {
 		}
 		$tweet->{ 'text' } =~ s/&lt;/</gi;
 		$tweet->{ 'text' } =~ s/&gt;/>/gi;
+		$tweet->{ 'text' } =~ s/&amp;/&/gi;
 		$tweet->{ 'text' } =~ s/\n/ /gs;
 		if( $twoline ) {
 			my @lines = split( /\n/s, Text::Wrap::wrap( "", "", $tweet->{ 'text' } ) );

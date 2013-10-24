@@ -24,6 +24,8 @@ along with twipper.  If not, see <http://www.gnu.org/licenses/>.
 use warnings;
 use strict;
 
+use feature "state";
+
 use Module::Load::Conditional qw( can_load );
 use Net::OAuth;
 $Net::OAuth::PROTOCOL_VERSION = Net::OAuth::PROTOCOL_VERSION_1_0A;
@@ -32,7 +34,6 @@ use HTTP::Request::Common;
 use LWP::UserAgent;
 use Storable;
 use Getopt::Long;
-use Data::Dumper;
 use JSON;
 use Date::Calc qw(System_Clock Decode_Month Delta_DHMS);
 use Math::Random::Secure qw(rand);
@@ -97,6 +98,7 @@ my( $token, $token_secret ) = getAuth();
 
 my $tweetVar = "";
 my $tweetLabel = "(0/140)";
+my $tweetEntry;
 
 if( $fetch == 1 ) {
 	exit fetch();
@@ -118,7 +120,7 @@ sub runWindowed {
 	my $rootWindow = MainWindow->new;
 	$rootWindow->title( "twipper.pl: tweet" );
 	$rootWindow->bind( "<Control-q>" => [ sub { exit(0); } ] );
-	my $tweetEntry = $rootWindow->Entry( -textvariable => \$tweetVar, -validate => "all", -vcmd => \&validateFromGUI, -font => $rootWindow->fontCreate( "entryFont" ) );
+	$tweetEntry = $rootWindow->Entry( -textvariable => \$tweetVar, -validate => "all", -vcmd => \&validateFromGUI, -font => $rootWindow->fontCreate( "entryFont" ) );
 	$tweetEntry->bind( "<Return>" => \&tweetFromGUI );
 	$tweetEntry->bind( "<Escape>" => \&clearFromGUI );
 	$tweetEntry->after( 1000, \&updateConfigInfo );
@@ -165,8 +167,39 @@ sub clearFromGUI {
 	$tweetVar = "";
 }
 
+sub validateReply {
+	my $content = shift;
+	my( $cmd, $num, $text ) = split( / /, $content, 3 );
+	my $tweet = numToTweet( $num );
+	if( $tweet ) {
+		my $id = $tweet->{ "id" };
+		my $len = 2+length( $tweet->{ "user" }->{ "screen_name" } ); # "@" <screen_name> " "
+		if( $text ) {
+			$len += calculateLength( $text, 0 );
+		}
+		$tweetLabel = sprintf( "@%s (%d/140)", $tweet->{ "user" }->{ "screen_name" }, $len );
+		if( $len <= 140 ) {
+			return 1;
+		}
+		return 0;
+	} else {
+		$tweetLabel = "UNKNOWN";
+		return 1;
+	}
+}
+
 sub validateFromGUI {
-	my $len = calculateLength( shift, 0 );
+	my $content = shift;
+	if( substr( $content, 0, 1 ) eq "/" ) {
+		if( substr( $content, 1, 1 ) eq "/" ) {
+			$content = substr( $content, 1 );
+		} else {
+			if( $content =~ m'^/reply 'i ) {
+				return validateReply( $content );
+			}
+		}
+	}
+	my $len = calculateLength( $content, 0 );
 	if( $len <= 140 ) {
 		$tweetLabel = sprintf( "(%d/140)", $len );
 		return 1;
@@ -192,17 +225,31 @@ sub calculateLength {
 	return $len;
 }
 
+sub tweetReply {
+	my( $num, $text ) = @_;
+	my $tweet = numToTweet( $num );
+	unless( defined $tweet ) {
+		return 0;
+	}
+	tweet( "@".($tweet->{ "user" }->{ "screen_name" })." $text", $tweet->{ "id" } );
+	$tweetVar = "";
+}
+
 sub tweetFromGUI {
-	if( length( $tweetVar ) > 0 ) {
-		tweet( $tweetVar );
-		$tweetVar = "";
+	if( $tweetVar =~ m!^/reply ([0-9]+) (.*)$!i ) {
+		tweetReply( $1, $2 );
+	} else {
+		if( length( $tweetVar ) > 0 ) {
+			tweet( $tweetVar );
+			$tweetVar = "";
+		}
 	}
 }
 
 sub getAuth {
 	my( $token, $token_secret );
 
-	if( ! -e <~/.twipper.secret> ) {
+	if( ! -e $ENV{"HOME"}."/.twipper.secret" ) {
 		print( "You have not yet configured $0. Would you like to do so now? ([Y]/n) " );
 		my $response = <>;
 		chomp $response if( $response );
@@ -268,12 +315,12 @@ sub getAuth {
 		$token = $oaResponse->token;
 		$token_secret = $oaResponse->token_secret;
 		
-		store [ $token, $token_secret ], <~/.twipper.secret> or
+		store [ $token, $token_secret ], $ENV{"HOME"}."/.twipper.secret" or
 			die( "Ack! I couldn't save your oauth tokens: $!" );
 	
 		print( "Excellent! We're on our way. You shouldn't have to do this again.\n" );
 	} else {
-		my $arr = retrieve( <~/.twipper.secret> ) or
+		my $arr = retrieve( $ENV{"HOME"}."/.twipper.secret" ) or
 			die( "Ack! I couldn't retrieve your oauth tokens: $!" );
 		( $token, $token_secret ) = @$arr;
 	}
@@ -282,6 +329,7 @@ sub getAuth {
 
 sub tweet {
 	my $status = shift;
+	my $reply = (shift or undef);
 	if( !$status ) {
 		if( scalar @ARGV > 0 ) {
 			$status = join( ' ', @ARGV );
@@ -303,6 +351,12 @@ sub tweet {
 		return 1;
 	}
 	
+	my $extra = {
+		status => $status
+	};
+	if( defined( $reply ) ) {
+		$extra->{ "in_reply_to_status_id" } = $reply;
+	}
 	my $oaRequest = Net::OAuth->request( "protected resource" )->new(
 		consumer_key     => $consumer_key,
 		consumer_secret  => $consumer_secret,
@@ -313,9 +367,7 @@ sub tweet {
 		nonce            => sha256_hex( rand ),
 		token            => $token,
 		token_secret     => $token_secret,
-		extra_params => {
-			status => $status
-		}
+		extra_params     => $extra,
 	);
 
 	$oaRequest->sign();
@@ -329,7 +381,7 @@ sub tweet {
 			warn( "Something bad happened: ".$response->status_line() );
 			if( $response->code == "401" ) {
 				warn( "More specifically, it was a 401- this usually means $0 was de-authorized." );
-				print( STDERR "If you think this might be the case, please try deleting ".<~/.twipper.secret>." and running me again.\n" );
+				print( STDERR "If you think this might be the case, please try deleting ".$ENV{"HOME"}."/.twipper.secret and running me again.\n" );
 			}
 			return 1;
 		}
@@ -395,7 +447,7 @@ sub fetch {
 		warn( "Something bad happened retrieving ".$oaRequest->request_url().": ".$response->status_line() );
 		if( $response->code == "401" ) {
 			print( STDERR "More specifically, it was a 401- this usually means $0 was de-authorized.", "\n" );
-			print( STDERR "If you think this might be the case, please try deleting ".<~/.twipper.secret>." and running me again.\n" );
+			print( STDERR "If you think this might be the case, please try deleting ".$ENV{"HOME"}."/.twipper.secret> and running me again.\n" );
 		} else {
 			print( STDERR "Sent:\n".$http_request->as_string, "\n" );
 			print( STDERR "Received:\n".$response->as_string, "\n" );
@@ -406,9 +458,12 @@ sub fetch {
 	my @now = System_Clock(1);
 
 	my $namelen = 0;
-	for my $tweet (@$content) {
+	my $numlen = 0;
+	for my $tweet (reverse @$content) {
 		my $l = length $tweet->{ 'user' }->{ 'screen_name' };
+		my $n = length( sprintf( "#%d", tweetToNum( $tweet ) ) );
 		$namelen = $l if( $l > $namelen );
+		$numlen = $n if( $n > $numlen );
 	}
 	$namelen += 2; # Two for the ": " that follows names
 
@@ -432,6 +487,7 @@ sub fetch {
 		my @date = split( / /, $tweet->{ "created_at" } );
 		my $line = "";
 		my $delta;
+		my $num = tweetToNum( $tweet );
 		@date = Delta_DHMS( $date[5], Decode_Month( $date[1] ), $date[2], split( /:/, $date[3] ), @now[0..5] );
 		if( $date[0] > 0 ) {
 			$delta = sprintf( "%2dd", $date[0] );
@@ -450,12 +506,13 @@ sub fetch {
 			my @lines = split( /\n/s, Text::Wrap::wrap( "", "", $tweet->{ 'text' } ) );
 			printf( "%".($namelen-1)."s%s\n", $tweet->{ 'user' }->{ 'screen_name' }.$vsep, shift @lines );
 			printf( "%".($namelen-2)."s".$vsep."%s\n", $delta." ago", ($lines[0]?shift @lines:"") );
+			printf( "%".($namelen-2)."s".$vsep."%s\n", "#".$num,      ($lines[0]?shift @lines:"") );
 			for my $line( @lines ) {
 				print( " "x($namelen-2).$vsep."$line\n" );
 			}
 			print( ($hsep)x($namelen-2).$isect.($hsep)x($wrap-$namelen+1)."\n" );
 		} else {
-			$line = sprintf( "$delta ago, %".$namelen."s%s\n", $tweet->{ 'user' }->{ 'screen_name' }.": ", $tweet->{ 'text' } );
+			$line = sprintf( "%".$numlen."s, $delta ago, %".$namelen."s%s\n", "#".$num, $tweet->{ 'user' }->{ 'screen_name' }.": ", $tweet->{ 'text' } );
 			if( $wrap != 0 ) {
 				print( Text::Wrap::wrap( "", " " x $indent, $line ) );
 			} else {
@@ -464,4 +521,72 @@ sub fetch {
 		}
 	}
 	exit 0;	
+}
+
+sub numToTweet {
+	state $mtime = 0;
+	state $buffer = undef;
+	my $file_mtime = (stat( $ENV{"HOME"}."/.twipper.refs" ))[9] ;
+	if( $file_mtime > $mtime ) {
+		$buffer = retrieve( $ENV{"HOME"}."/.twipper.refs" ) or
+			return undef;
+	}
+	my $num = shift;
+	return $buffer->{ $num }->[1];
+}
+
+sub tweetToNum {
+	my $tweet = shift;
+	my $id = $tweet->{ "id" };
+	state $buffer;
+	if( -e $ENV{"HOME"}."/.twipper.refs" ) {
+		$buffer = retrieve( $ENV{"HOME"}."/.twipper.refs" )
+			unless defined $buffer;
+	} else {
+		$buffer = { begin => 0, end => 0 }
+			unless defined $buffer;
+	}
+	my $begin = $buffer->{ "begin" };
+	my $end = $buffer->{ "end" };
+
+	# If begin and end are equal, the buffer is empty.
+	if( $end < $begin ) {
+		for( my $i = $begin; $i < 100; $i++ ) {
+			if( $buffer->{ $i }->[0] == $id ) {
+				$buffer->{ $i }->[1] = $tweet;
+				store( $buffer, $ENV{"HOME"}."/.twipper.refs" );
+				return $i;
+			}
+		}
+		for( my $i = 0; $i <= $end; $i++ ) {
+			if( $buffer->{ $i }->[0] == $id ) {
+				$buffer->{ $i }->[1] = $tweet;
+				store( $buffer, $ENV{"HOME"}."/.twipper.refs" );
+				return $i;
+			}
+		}
+	} elsif( $end > $begin ) {
+		for( my $i = $begin; $i < $end; $i++ ) {
+			if( $buffer->{ $i }->[0] == $id ) {
+				$buffer->{ $i }->[1] = $tweet;
+				store( $buffer, $ENV{"HOME"}."/.twipper.refs" );
+				return $i;
+			}
+		}
+	}
+
+	$end++;
+	if( $end == 100 ) {
+		$end = 0;
+	}
+	if( $end == $begin ) {
+		$begin++;
+		if( $begin == 100 ) {
+			$begin = 0;
+		}
+	}
+	$buffer->{ $end-1 } = [ $id, $tweet ];
+	$buffer->{ "end" } = $end;
+	store( $buffer, $ENV{"HOME"}."/.twipper.refs" );
+	return $end-1;
 }

@@ -99,6 +99,7 @@ my( $token, $token_secret ) = getAuth();
 my $tweetVar = "";
 my $tweetLabel = "(0/140)";
 my $tweetEntry;
+my %commands;
 
 if( $fetch == 1 ) {
 	exit fetch();
@@ -116,6 +117,14 @@ sub runWindowed {
 	unless( can_load( Modules => { "Tk" => undef } ) ) {
 		die( "Undable to load perl Tk module. Please install the package (perl-tk on Debian) or module and try again:\n".$Module::Load::Conditional::ERROR );
 	}
+
+	# validate returns 0 (meaning keystroke made the tweet invalid) or 1 
+	# (meaning keystroke made the tweet valid and/or more keystrokes could make 
+	# it valid), and may change $tweetLabel for interactions
+	%commands = (
+		"reply" => [ \&validateReply, \&tweetReply ],
+		"rt" => [ \&validateRetweet, \&tweetRetweet ],
+	);
 
 	my $rootWindow = MainWindow->new;
 	$rootWindow->title( "twipper.pl: tweet" );
@@ -167,6 +176,92 @@ sub clearFromGUI {
 	$tweetVar = "";
 }
 
+sub validateRetweet {
+	my $content = shift;
+	my( $cmd, $num, $text ) = split( / /, $content, 3 );
+
+	if(defined $num && length($num)==0) {
+		$tweetLabel = "RT ...";
+		return 1;
+	}
+	unless( $num =~ m/^[0-9]*$/ ) {
+		return 0;
+	}
+	return 0 if $content =~ m/^[^ ]+ [0-9]+ .*$/;
+
+	my $tweet = numToTweet( $num );
+	if( $tweet ) {
+		my $id = $tweet->{ "id" };
+		$tweetLabel = sprintf( "RT @%s", $tweet->{ "user" }->{ "screen_name" } );
+
+		# Can continue typing numbers, but nothing else.
+		if( $content =~ m/^[^ ]+ [^ ]+ / ) {
+			return 0;
+		}
+		return 1;
+	} else {
+		$tweetLabel = "Bad Tweet Number";
+		if( $content =~ m!/[^ ]+ ([0-9]+)] !i ) {
+			return 0;
+		} else {
+			return 1;
+		}
+	}
+}
+
+sub tweetRetweet {
+	my $content = shift;
+	my( $cmd, $num, $text ) = split( / /, $content, 3 );
+	my $tweet = numToTweet( $num );
+	unless( $tweet ) {
+		$tweetLabel = "Bad Tweet Number";
+		return 0;
+	}
+
+	my $id = $tweet->{ "id" };
+
+	my $extra = {
+		trim_user => 1,
+	};
+
+	my $oaRequest = Net::OAuth->request( "protected resource" )->new(
+		consumer_key     => $consumer_key,
+		consumer_secret  => $consumer_secret,
+		request_url      => 'https://api.twitter.com/1.1/statuses/retweet/'.$id.'.json',
+		request_method   => 'POST',
+		signature_method => 'HMAC-SHA1',
+		timestamp        => time,
+		nonce            => sha256_hex( rand ),
+		token            => $token,
+		token_secret     => $token_secret,
+		extra_params     => $extra,
+	);
+
+	use Data::Dumper;
+	print( Dumper( $oaRequest ) );
+
+	$oaRequest->sign();
+
+	if( $dryrun ) {
+		print( "Not actually tweeting.\n" );
+		$tweetVar = "";
+		return 1;
+	} else {
+		my $response = $userAgent->request( POST $oaRequest->to_url() );
+		if( !$response->is_success() ) {
+			warn( "Something bad happened: ".$response->status_line() );
+			if( $response->code == "401" ) {
+				warn( "More specifically, it was a 401- this usually means $0 was de-authorized." );
+				print( STDERR "If you think this might be the case, please try deleting ".$ENV{"HOME"}."/.twipper.secret and running me again.\n" );
+			}
+			return 1;
+		}
+	}
+
+	$tweetVar = "";
+	return 0;
+}
+
 sub validateReply {
 	my $content = shift;
 	my( $cmd, $num, $text ) = split( / /, $content, 3 );
@@ -183,22 +278,34 @@ sub validateReply {
 		}
 		return 0;
 	} else {
-		$tweetLabel = "UNKNOWN";
-		return 1;
+		$tweetLabel = "Bad Tweet Number";
+		if( $content =~ m!/reply ([0-9]+)] !i ) {
+			return 0;
+		} else {
+			return 1;
+		}
 	}
 }
 
+sub tweetReply {
+	my( $num, $text ) = split( / /, shift, 2 );
+	my $tweet = numToTweet( $num );
+	unless( defined $tweet ) {
+		return 0;
+	}
+	tweet( "@".($tweet->{ "user" }->{ "screen_name" })." $text", $tweet->{ "id" } );
+	$tweetVar = "";
+}
+
+
 sub validateFromGUI {
 	my $content = shift;
-	if( substr( $content, 0, 1 ) eq "/" ) {
-		if( substr( $content, 1, 1 ) eq "/" ) {
-			$content = substr( $content, 1 );
-		} else {
-			if( $content =~ m'^/reply 'i ) {
-				return validateReply( $content );
-			}
+	if( $content =~ m!^/([a-z]+) (.*)$!i ) {
+		if( exists( $commands{ $1 } ) ) {
+			return ($commands{ $1 }->[0])->( $content );
 		}
 	}
+
 	my $len = calculateLength( $content, 0 );
 	if( $len <= 140 ) {
 		$tweetLabel = sprintf( "(%d/140)", $len );
@@ -225,24 +332,17 @@ sub calculateLength {
 	return $len;
 }
 
-sub tweetReply {
-	my( $num, $text ) = @_;
-	my $tweet = numToTweet( $num );
-	unless( defined $tweet ) {
-		return 0;
-	}
-	tweet( "@".($tweet->{ "user" }->{ "screen_name" })." $text", $tweet->{ "id" } );
-	$tweetVar = "";
-}
-
 sub tweetFromGUI {
-	if( $tweetVar =~ m!^/reply ([0-9]+) (.*)$!i ) {
-		tweetReply( $1, $2 );
-	} else {
-		if( length( $tweetVar ) > 0 ) {
-			tweet( $tweetVar );
-			$tweetVar = "";
+	my $content = $tweetVar;
+	if( $content =~ m!^/([a-z]+) (.*)$!i ) {
+		if( exists( $commands{ $1 } ) ) {
+			return ($commands{ $1 }->[1])->( $content );
 		}
+	}
+
+	if( length( $tweetVar ) > 0 ) {
+		tweet( $tweetVar );
+		$tweetVar = "";
 	}
 }
 
@@ -526,12 +626,14 @@ sub fetch {
 sub numToTweet {
 	state $mtime = 0;
 	state $buffer = undef;
+	my $num = shift;
+	return undef unless defined $num && $num =~ /^[0-9]+$/;
+
 	my $file_mtime = (stat( $ENV{"HOME"}."/.twipper.refs" ))[9] ;
 	if( $file_mtime > $mtime ) {
 		$buffer = retrieve( $ENV{"HOME"}."/.twipper.refs" ) or
 			return undef;
 	}
-	my $num = shift;
 	return $buffer->{ $num }->[1];
 }
 

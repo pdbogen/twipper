@@ -288,9 +288,11 @@ sub validateReply {
 }
 
 sub tweetReply {
-	my( $num, $text ) = split( / /, shift, 2 );
+	my $content = shift;
+	my( $cmd, $num, $text ) = split( / /, $content, 3 );
 	my $tweet = numToTweet( $num );
 	unless( defined $tweet ) {
+		$tweetLabel = "Bad Tweet Number";
 		return 0;
 	}
 	tweet( "@".($tweet->{ "user" }->{ "screen_name" })." $text", $tweet->{ "id" } );

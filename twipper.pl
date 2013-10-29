@@ -126,8 +126,8 @@ sub runWindowed {
 		die( "Undable to load perl Tk module. Please install the package (perl-tk on Debian) or module and try again:\n".$Module::Load::Conditional::ERROR );
 	}
 
-	# validate returns 0 (meaning keystroke made the tweet invalid) or 1 
-	# (meaning keystroke made the tweet valid and/or more keystrokes could make 
+	# validate returns 0 (meaning keystroke made the tweet invalid) or 1
+	# (meaning keystroke made the tweet valid and/or more keystrokes could make
 	# it valid), and may change $tweetLabel for interactions
 	%commands = (
 		"reply" => [ \&validateReply, \&tweetReply ],
@@ -438,7 +438,7 @@ sub getAuth {
 		}
 
 		print( "Great! One second, I'm retrieving a request token...\n" );
-	
+
 		my $oaRequest = Net::OAuth->request( "request token" )->new(
 			consumer_key     => $consumer_key,
 			consumer_secret  => $consumer_secret,
@@ -449,27 +449,27 @@ sub getAuth {
 			nonce            => sha256_hex( rand ),
 			callback         => "oob"
 		);
-	
+
 		$oaRequest->sign();
-	
+
 		$response = $userAgent->request( POST $oaRequest->to_url() );
-	
+
 		if( !($response->is_success()) ) {
 			warn( "Sorry, something bad happened along the way to Twitter: ".$response->status_line() );
 			return;
 		}
-	
+
 		my $oaResponse = Net::OAuth->response( 'request token' )->from_post_body( $response->content );
-	
+
 		$token = $oaResponse->token;
 		$token_secret = $oaResponse->token_secret;
-	
+
 		print( "Okay, got it! Next, you need to visit this URL to grant me write access to your twitter account:\n\n" );
 		print( "http://api.twitter.com/oauth/authorize?oauth_token=$token\n\n" );
 		print( "You should receive a PIN once you select 'Allow'. Please enter that PIN: " );
 		$response = <>;
 		chomp $response if( $response );
-	
+
 		$oaRequest = Net::OAuth->request( "access token" )->new(
 			consumer_key     => $consumer_key,
 			consumer_secret  => $consumer_secret,
@@ -489,14 +489,14 @@ sub getAuth {
 			print( STDERR "This might mean you denied $0 access. If you meant to do that, well, sorry to see you go. Otherwise, please run me again.\n" );
 			exit 1;
 		}
-	
+
 		$oaResponse = Net::OAuth->response( 'access token' )->from_post_body( $response->content );
 		$token = $oaResponse->token;
 		$token_secret = $oaResponse->token_secret;
-		
+
 		store [ $token, $token_secret ], $ENV{"HOME"}."/.twipper.secret" or
 			die( "Ack! I couldn't save your oauth tokens: $!" );
-	
+
 		print( "Excellent! We're on our way. You shouldn't have to do this again.\n" );
 	} else {
 		my $arr = retrieve( $ENV{"HOME"}."/.twipper.secret" ) or
@@ -522,14 +522,14 @@ sub tweet {
 			}
 		}
 	}
-	
+
 	# Calculate length, retrieving the config info in blocking mode if necessary
 	my $len = calculateLength( $status, 1 );
 	if( $len > 140 ) {
 		print( STDERR "Oops! The tweet may not exceed the 140-character limit. You went over by ".($len - 140), "\n" );
 		return 0;
 	}
-	
+
 	my $extra = {
 		status => $status
 	};
@@ -657,7 +657,7 @@ sub fetch {
 		$indent = 9 + $namelen;
 	}
 
-	
+
 	my( $hsep, $vsep, $isect ) = ( " ", " ", " " );
 	if( $drawlines ) {
 		$hsep = "-"; $vsep = "|"; $isect = "+";
@@ -701,7 +701,7 @@ sub fetch {
 			}
 		}
 	}
-	exit 0;	
+	exit 0;
 }
 
 sub numToTweet {

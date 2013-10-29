@@ -562,11 +562,10 @@ sub tweet {
 				warn( "More specifically, it was a 401- this usually means $0 was de-authorized." );
 				print( STDERR "If you think this might be the case, please try deleting ".$ENV{"HOME"}."/.twipper.secret and running me again.\n" );
 			}
-			return 1;
+			return 0;
 		}
+		return 1;
 	}
-
-	return 0;
 }
 
 sub usage {

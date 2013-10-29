@@ -132,6 +132,7 @@ sub runWindowed {
 	%commands = (
 		"reply" => [ \&validateReply, \&tweetReply ],
 		"rt" => [ \&validateRetweet, \&tweetRetweet ],
+		"go" => [ \&validateGo, \&tweetGo ],
 	);
 
 	my $rootWindow = MainWindow->new;
@@ -188,6 +189,58 @@ sub updateConfigInfo {
 sub clearFromGUI {
 	$tweetVar = "";
 }
+
+sub validateGo {
+	my $content = shift;
+	my( $cmd, $num, $text ) = split( / /, $content, 3 );
+	$tweetLabel = "GO ...";
+
+	# validate overall format
+	return 0 unless $content =~ m!/go [0-9]*( [0-9]*)?$!i;
+
+	# validate tweet #
+	return 1 if $num eq "";
+	my $tweet = numToTweet( $num );
+	my @urls = ( @{$tweet->{ "entities" }->{ "urls" }}, grep { exists $_->{ "url" } } @{$tweet->{ "entities" }->{ "media" }} );
+	return 0 unless defined $tweet;
+
+	$text = 1 if (!defined $text || $text eq "");
+	return 0 unless $text =~ m/^[1-9][0-9]*$/;
+	unless( exists $urls[ $text - 1 ] ) {
+		$tweetLabel = ($text==1?"no URLs":"no such URL");
+		return ($text==1);
+	}
+	my $url = $urls[ $text - 1 ];
+	my( $domain ) = split( '/', $url->{ "display_url" }, 2 );
+	$tweetLabel = $domain;
+}
+
+sub tweetGo {
+	my $content = shift;
+
+	# Parse command
+	my( $cmd, $num, $text ) = split( / /, $content, 3 );
+	$text = 1 if (!defined $text || $text eq "");
+
+	# Make sure validation is consistent
+	return 0 unless validateGo( $content );
+
+	# Locate tweet, parse URLs out (embedded URLs + media)
+	my $tweet = numToTweet( $num );
+	my @urls = ( @{$tweet->{ "entities" }->{ "urls" }}, grep { exists $_->{ "url" } } @{$tweet->{ "entities" }->{ "media" }} );
+
+	# This doesn't always fail for validateGo, but should fail here
+	unless( exists $urls[ $text - 1 ] ) {
+		return 0;
+	}
+
+	# Call out to x-www-browser, set a temporary tweetLabel, clear tweetVar, return success
+	system( 'x-www-browser "'.$urls[ $text - 1 ]->{ "url" }.'"' );
+	$tweetLabel = "going...";
+	$tweetVar = "";
+	return 1;
+}
+
 
 sub validateRetweet {
 	my $content = shift;

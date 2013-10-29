@@ -140,8 +140,6 @@ sub runWindowed {
 	$tweetEntry = $rootWindow->Entry( -textvariable => \$tweetVar, -validate => "all", -vcmd => \&validateFromGUI, -font => $rootWindow->fontCreate( "entryFont" ) );
 	$tweetEntry->bind( "<Return>" => \&tweetFromGUI );
 	$tweetEntry->bind( "<Escape>" => \&clearFromGUI );
-	$tweetEntry->after( 1000, \&updateConfigInfo );
-	$tweetEntry->after( 3600000, \&updateConfigInfo );
 	$tweetEntry->focus();
 	$tweetEntry->place( -anchor => "nw", -x => 0, -y => 0 ); #pack( -side => "left", -fill => "both", -expand => 0 );
 	my $label = $rootWindow->Label( -textvariable => \$tweetLabel, -font => $rootWindow->fontCreate( "labelFont" ) );#, -font => $rootWindow->Font( -family => "Courier" ) );
@@ -156,6 +154,11 @@ sub runWindowed {
 }
 
 sub updateConfigInfo {
+
+	# Only update once an hour.
+	state $lastUpdate = 0;
+	return unless time > ($lastUpdate+3600);
+
 	my $oaRequest = Net::OAuth->request( "protected resource" )->new(
 		consumer_key     => $consumer_key,
 		consumer_secret  => $consumer_secret,
@@ -172,7 +175,9 @@ sub updateConfigInfo {
 	if( !$response->is_success() ) {
 		print( STDERR "TWITTER: Error: ".$response->status_line(), "\n" );
 		print( STDERR "TWITTER: URL was '".$oaRequest->to_url()."'\n" );
-		die( "Failed to retrieve configuration information from twitter; cannot discern the shortened length of URLs. URLs will not be handled specially." );
+		# Schedule another update for after when the rate limit resets, to avoid making a bunch of failed calls
+		$lastUpdate = $response->header( "x-rate-limit-reset" ) - 3599;
+		warn( "Failed to retrieve configuration information from twitter; cannot discern the shortened length of URLs. URLs will not be handled specially." );
 	} else {
 		my $response_data = decode_json $response->content();
 		$shortenLengthHttp = $response_data->{ "short_url_length" };
@@ -328,16 +333,17 @@ sub calculateLength {
 	my $val = shift;
 	my $block = shift;
 	my $len = length $val;
-	if( ( $shortenLengthHttp == -1 || $shortenLengthHttps == -1 ) && $block ) {
+
+	if( $val =~ m'https?://[^\s]+' ) {
 		updateConfigInfo();
-	}
-	if( $shortenLengthHttp != -1 && $shortenLengthHttps != -1 ) {
-		my $url_munged_what = $val;
-		my $http_placeholder = "x"x$shortenLengthHttp;
-		my $https_placeholder = "x"x$shortenLengthHttps;
-		$url_munged_what =~ s/http:\/\/[^\s]+/$http_placeholder/g;
-		$url_munged_what =~ s/https:\/\/[^\s]+/$https_placeholder/g;
-		$len = length $url_munged_what;
+		if( $shortenLengthHttp != -1 && $shortenLengthHttps != -1 ) {
+			my $url_munged_what = $val;
+			my $http_placeholder = "x"x$shortenLengthHttp;
+			my $https_placeholder = "x"x$shortenLengthHttps;
+			$url_munged_what =~ s/http:\/\/[^\s]+/$http_placeholder/g;
+			$url_munged_what =~ s/https:\/\/[^\s]+/$https_placeholder/g;
+			$len = length $url_munged_what;
+		}
 	}
 	return $len;
 }

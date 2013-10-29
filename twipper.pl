@@ -159,7 +159,7 @@ sub updateConfigInfo {
 	# Only update once an hour.
 	state $lastUpdate = 0;
 	return unless time > ($lastUpdate+3600);
-
+	$lastUpdate = time;
 	my $oaRequest = Net::OAuth->request( "protected resource" )->new(
 		consumer_key     => $consumer_key,
 		consumer_secret  => $consumer_secret,

@@ -53,6 +53,7 @@ my $indent=0;
 my $twoline=0;
 my $drawlines=0;
 my $dryrun=0;
+my $oneshot=0;
 my $shortenLengthHttp=-1;
 my $shortenLengthHttps=-1;
 
@@ -67,7 +68,14 @@ GetOptions(
 	"twoline|t" => \$twoline,
 	"drawlines" => \$drawlines,
 	"dry-run|n" => \$dryrun,
+	"one-shot|1" => \$oneshot,
 ) or usage();
+
+if( $oneshot && $window==0 ) {
+	warn( "--one-shot doesn't make sense without --window" );
+	usage();
+	exit 1;
+}
 
 if( $twoline && $wrap==0 ) {
 	warn( "--twoline requires setting a wrap length with --wrap" );
@@ -295,8 +303,8 @@ sub tweetReply {
 		$tweetLabel = "Bad Tweet Number";
 		return 0;
 	}
-	tweet( "@".($tweet->{ "user" }->{ "screen_name" })." $text", $tweet->{ "id" } );
 	$tweetVar = "";
+	return tweet( "@".($tweet->{ "user" }->{ "screen_name" })." $text", $tweet->{ "id" } );
 }
 
 
@@ -338,13 +346,23 @@ sub tweetFromGUI {
 	my $content = $tweetVar;
 	if( $content =~ m!^/([a-z]+) (.*)$!i ) {
 		if( exists( $commands{ $1 } ) ) {
-			return ($commands{ $1 }->[1])->( $content );
+			if( ($commands{ $1 }->[1])->( $content ) ) {
+				exit(0) if $oneshot;
+				return 1;
+			} else {
+				return 0;
+			}
 		}
 	}
 
 	if( length( $tweetVar ) > 0 ) {
-		tweet( $tweetVar );
-		$tweetVar = "";
+		if( tweet( $tweetVar ) ) {
+			$tweetVar = "";
+			exit(0) if $oneshot;
+			return 1;
+		} else {
+			return 0;
+		}
 	}
 }
 
@@ -450,7 +468,7 @@ sub tweet {
 	my $len = calculateLength( $status, 1 );
 	if( $len > 140 ) {
 		print( STDERR "Oops! The tweet may not exceed the 140-character limit. You went over by ".($len - 140), "\n" );
-		return 1;
+		return 0;
 	}
 	
 	my $extra = {
@@ -493,7 +511,7 @@ sub tweet {
 }
 
 sub usage {
-	print( "Usage: $0 [-f] [-c <count>] [-w] [<tweet>]\n\n" );
+	print( "Usage: $0 [-1] [-f] [-c <count>] [-w] [<tweet>]\n\n" );
 	print( "    -f, --fetch      Instead of updating Twitter, fetch your personal timeline\n" );
 	print( "    -c, --count <#>  Specifies the number of tweets to fetch. The default is 5,\n" );
 	print( "                     if not specified.\n" );
@@ -508,6 +526,8 @@ sub usage {
 	print( "    -s, --stdin      Read and post a tweet from stdin\n" );
 	print( "    -w, --window     Run in 'windowed' mode, which means a small window that\n" );
 	print( "                     lives forever and lets you post to Twitter.\n" );
+	print( "    -1, --one-shot   With --window, only process one command before exiting. Like\n" );
+	print( "                     a run dialog, but for Twitter.\n" );
 	print( "    -b, --blank      Exit immediately if xscreensaver-command reports the screen\n" );
 	print( "                     is blanked. This is handy, since twitter does rate limiting\n" );
 	print( "                     per account. If this script is run from conky on multiple\n" );

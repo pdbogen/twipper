@@ -188,6 +188,10 @@ sub updateConfigInfo {
 
 sub clearFromGUI {
 	$tweetVar = "";
+	# In one shot mode, escape should close the window.
+	if( $oneshot ) {
+		exit(0);
+	}
 }
 
 sub validateGo {

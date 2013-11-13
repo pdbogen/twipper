@@ -211,7 +211,7 @@ sub validateGo {
 	$text = 1 if (!defined $text || $text eq "");
 	return 0 unless $text =~ m/^[1-9][0-9]*$/;
 	unless( exists $urls[ $text - 1 ] ) {
-		$tweetLabel = ($text==1?"no URLs":"no such URL");
+		$tweetLabel = ($text==1?"GO to tweet":"no such URL");
 		return ($text==1);
 	}
 	my $url = $urls[ $text - 1 ];
@@ -234,12 +234,19 @@ sub tweetGo {
 	my @urls = ( @{$tweet->{ "entities" }->{ "urls" }}, grep { exists $_->{ "url" } } @{$tweet->{ "entities" }->{ "media" }} );
 
 	# This doesn't always fail for validateGo, but should fail here
+	my $url;
 	unless( exists $urls[ $text - 1 ] ) {
-		return 0;
+		if( $text == 1 ) {
+			$url = "https://twitter.com/".$tweet->{ "user" }->{ "screen_name" }."/status/".$tweet->{ "id" };
+		} else {
+			return 0;
+		}
+	} else {
+		$url = $urls[ $text - 1 ]->{ "url" };
 	}
 
 	# Call out to x-www-browser, set a temporary tweetLabel, clear tweetVar, return success
-	system( 'x-www-browser "'.$urls[ $text - 1 ]->{ "url" }.'"' );
+	system( 'x-www-browser "'.$url.'"' );
 	$tweetLabel = "going...";
 	$tweetVar = "";
 	return 1;
@@ -726,12 +733,15 @@ sub tweetToNum {
 	my $id = $tweet->{ "id" };
 	state $buffer;
 	if( -e $ENV{"HOME"}."/.twipper.refs" ) {
-		$buffer = retrieve( $ENV{"HOME"}."/.twipper.refs" )
-			unless defined $buffer;
-	} else {
-		$buffer = { begin => 0, end => 0 }
-			unless defined $buffer;
+		eval {
+			$buffer = retrieve( $ENV{"HOME"}."/.twipper.refs" )
+				unless defined $buffer;
+		}; warn $@ if $@;
 	}
+
+	$buffer = { begin => 0, end => 0 }
+		unless defined $buffer;
+
 	my $begin = $buffer->{ "begin" };
 	my $end = $buffer->{ "end" };
 

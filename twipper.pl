@@ -137,6 +137,7 @@ sub runWindowed {
 
 	my $rootWindow = MainWindow->new;
 	$rootWindow->title( "twipper.pl: tweet" );
+	$rootWindow->geometry( "400x24" );
 	$rootWindow->bind( "<Control-q>" => [ sub { exit(0); } ] );
 	$tweetEntry = $rootWindow->Entry( -textvariable => \$tweetVar, -validate => "all", -vcmd => \&validateFromGUI, -font => $rootWindow->fontCreate( "entryFont" ) );
 	$tweetEntry->bind( "<Return>" => \&tweetFromGUI );

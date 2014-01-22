@@ -210,14 +210,18 @@ sub validateGo {
 	return 0 unless defined $tweet;
 
 	$text = 1 if (!defined $text || $text eq "");
-	return 0 unless $text =~ m/^[1-9][0-9]*$/;
-	unless( exists $urls[ $text - 1 ] ) {
-		$tweetLabel = ($text==1?"GO to tweet":"no such URL");
-		return ($text==1);
+	return 0 unless $text =~ m/^[0-9]+$/;
+	if( $text == 0 || ( !exists( $urls[0] ) && $text == 1 ) ) {
+		$tweetLabel = "GO to tweet";
+		return 1;
+	} elsif( exists $urls[ $text - 1 ] ) {
+		my $url = $urls[ $text - 1 ];
+		my( $domain ) = split( '/', $url->{ "display_url" }, 2 );
+		$tweetLabel = $domain;
+		return 1;
+	} else {
+		return 0;
 	}
-	my $url = $urls[ $text - 1 ];
-	my( $domain ) = split( '/', $url->{ "display_url" }, 2 );
-	$tweetLabel = $domain;
 }
 
 sub tweetGo {
@@ -236,14 +240,12 @@ sub tweetGo {
 
 	# This doesn't always fail for validateGo, but should fail here
 	my $url;
-	unless( exists $urls[ $text - 1 ] ) {
-		if( $text == 1 ) {
-			$url = "https://twitter.com/".$tweet->{ "user" }->{ "screen_name" }."/status/".$tweet->{ "id" };
-		} else {
-			return 0;
-		}
-	} else {
+	if( $text == 0 || ( !exists( $urls[ 0 ] ) && $text == 1 ) ) {
+		$url = "https://twitter.com/".$tweet->{ "user" }->{ "screen_name" }."/status/".$tweet->{ "id" };
+	} elsif( exists( $urls[ $text - 1 ] ) ) {
 		$url = $urls[ $text - 1 ]->{ "url" };
+	} else {
+		return 0;
 	}
 
 	# Call out to x-www-browser, set a temporary tweetLabel, clear tweetVar, return success

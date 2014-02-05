@@ -745,7 +745,10 @@ sub tweetToNum {
 	my $begin = $buffer->{ "begin" };
 	my $end = $buffer->{ "end" };
 
-	# If begin and end are equal, the buffer is empty.
+	# If begin and end are equal, the buffer is empty. Otherwise, search the
+	# buffer for the tweet ID, update the stored tweet if found and return the
+	# index.
+
 	if( $end < $begin ) {
 		for( my $i = $begin; $i < 100; $i++ ) {
 			if( $buffer->{ $i }->[0] == $id ) {

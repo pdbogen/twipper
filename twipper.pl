@@ -259,9 +259,10 @@ sub tweetGo {
 sub validateRetweet {
 	my $content = shift;
 	my( $cmd, $num, $text ) = split( / /, $content, 3 );
+	my $action = (shift or "RT");
 
 	if(defined $num && length($num)==0) {
-		$tweetLabel = "RT ...";
+		$tweetLabel = "$action ...";
 		return 1;
 	}
 	unless( $num =~ m/^[0-9]*$/ ) {
@@ -272,7 +273,7 @@ sub validateRetweet {
 	my $tweet = numToTweet( $num );
 	if( $tweet ) {
 		my $id = $tweet->{ "id" };
-		$tweetLabel = sprintf( "RT @%s", $tweet->{ "user" }->{ "screen_name" } );
+		$tweetLabel = sprintf( "%s @%s", $action, $tweet->{ "user" }->{ "screen_name" } );
 
 		# Can continue typing numbers, but nothing else.
 		if( $content =~ m/^[^ ]+ [^ ]+ / ) {

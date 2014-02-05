@@ -697,13 +697,13 @@ sub fetch {
 			my @lines = split( /\n/s, Text::Wrap::wrap( "", "", $tweet->{ 'text' } ) );
 			printf( "%".($namelen-1)."s%s\n", $tweet->{ 'user' }->{ 'screen_name' }.$vsep, shift @lines );
 			printf( "%".($namelen-2)."s".$vsep."%s\n", $delta." ago", ($lines[0]?shift @lines:"") );
-			printf( "%".($namelen-2)."s".$vsep."%s\n", "#".$num,      ($lines[0]?shift @lines:"") );
+			printf( "%".($namelen-2)."s".$vsep."%s\n", ($tweet->{ "favorited" }?"*":" ")." #".$num, ($lines[0]?shift @lines:"") );
 			for my $line( @lines ) {
 				print( " "x($namelen-2).$vsep."$line\n" );
 			}
 			print( ($hsep)x($namelen-2).$isect.($hsep)x($wrap-$namelen+1)."\n" );
 		} else {
-			$line = sprintf( "%".$numlen."s, $delta ago, %".$namelen."s%s\n", "#".$num, $tweet->{ 'user' }->{ 'screen_name' }.": ", $tweet->{ 'text' } );
+			$line = sprintf( "%s %".$numlen."s, $delta ago, %".$namelen."s%s\n", $tweet->{ "favorited" }?"*":" ", "#".$num, $tweet->{ 'user' }->{ 'screen_name' }.": ", $tweet->{ 'text' } );
 			if( $wrap != 0 ) {
 				print( Text::Wrap::wrap( "", " " x $indent, $line ) );
 			} else {

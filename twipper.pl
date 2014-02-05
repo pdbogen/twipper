@@ -133,6 +133,8 @@ sub runWindowed {
 		"reply" => [ \&validateReply, \&tweetReply ],
 		"rt" => [ \&validateRetweet, \&tweetRetweet ],
 		"go" => [ \&validateGo, \&tweetGo ],
+		"fave" => [ \&validateFave, \&tweetFave ],
+		"favorite" => [ \&validateFave, \&tweetFave ],
 	);
 
 	my $rootWindow = MainWindow->new;
@@ -256,6 +258,10 @@ sub tweetGo {
 }
 
 
+sub validateFave {
+	return validateRetweet( @_, "FAVE" );
+}
+
 sub validateRetweet {
 	my $content = shift;
 	my( $cmd, $num, $text ) = split( / /, $content, 3 );
@@ -287,6 +293,40 @@ sub validateRetweet {
 		} else {
 			return 1;
 		}
+	}
+}
+
+sub tweetFave {
+	my $content = shift;
+	my( $cmd, $num, $text ) = split( / /, $content, 3 );
+
+	# Weird looking code. Get the tweet ID from the buffer, refresh the tweet
+	# (so we have the latest fave info), and then re-fetch from the buffer.
+	my $tweet = numToTweet( $num );
+	$tweet = refreshTweet( $tweet->{ "id" } );
+	$tweet = numToTweet( $num );
+
+	unless( $tweet ) {
+		$tweetLabel = "Bad Tweet Number";
+		return 0;
+	}
+
+	my $result;
+	if( $tweet->{ "favorited" } ) {
+		$result = postSigned( 'https://api.twitter.com/1.1/favorites/destroy.json', { "id" => $tweet->{ "id" }, "include_entities" => "false" } );
+	} else {
+		$result = postSigned( 'https://api.twitter.com/1.1/favorites/create.json', { "id" => $tweet->{ "id" }, "include_entities" => "false" } );
+	}
+
+	if( $result == 200 ) {
+		$tweetVar = "";
+		return 1;
+	} elsif( $result == 403 ) {
+		$tweetVar = "";
+		return 1;
+	} else {
+		$tweetLabel = "ERROR $result";
+		return 0;
 	}
 }
 

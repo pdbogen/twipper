@@ -790,3 +790,79 @@ sub tweetToNum {
 	store( $buffer, $ENV{"HOME"}."/.twipper.refs" );
 	return $end-1;
 }
+
+sub postSigned {
+	my $url = shift or die( "postSigned called without a URL" );
+	my $extra = shift;
+	die( "extra parameters not a hashref" ) unless ref($extra) eq "HASH";
+
+	my $oaRequest = Net::OAuth->request( "protected resource" )->new(
+		consumer_key     => $consumer_key,
+		consumer_secret  => $consumer_secret,
+		request_url      => $url,
+		request_method   => 'POST',
+		signature_method => 'HMAC-SHA1',
+		timestamp        => time,
+		nonce            => sha256_hex( rand ),
+		token            => $token,
+		token_secret     => $token_secret,
+		extra_params     => $extra,
+	);
+
+	$oaRequest->sign();
+
+	if( $dryrun ) {
+		print( "not actually POSTing.\n" );
+		return 200;
+	} else {
+		my $response = $userAgent->request( POST $oaRequest->to_url() );
+		if( !$response->is_success() ) {
+			warn( "Something bad happened: ".$response->status_line() );
+			print( STDERR $response->content );
+			if( $response->code == "401" ) {
+				warn( "More specifically, it was a 401- this usually means $0 was de-authorized." );
+				print( STDERR "If you think this might be the case, please try deleting ".$ENV{"HOME"}."/.twipper.secret and running me again.\n" );
+			} elsif( $response->code >= 400 && $response->code < 500 ) {
+				warn( "400-series response code indicates a problem with this request" );
+				print( STDERR $response->as_string );
+			}
+		}
+		return $response->code();
+	}
+}
+
+sub refreshTweet {
+	my $id = shift or die( "refreshTweet called without tweet ID" );
+	die( "refreshTweet called with non-numeric tweet ID" ) unless $id =~ m/^[0-9]+$/;
+
+	my $oaRequest = Net::OAuth->request( "protected resource" )->new(
+		consumer_key     => $consumer_key,
+		consumer_secret  => $consumer_secret,
+		request_url      => 'https://api.twitter.com/1.1/statuses/show.json',
+		request_method   => 'GET',
+		signature_method => 'HMAC-SHA1',
+		timestamp        => time,
+		nonce            => sha256_hex( rand ),
+		token            => $token,
+		token_secret     => $token_secret,
+		extra_params     => { id => $id },
+	);
+
+	$oaRequest->sign();
+
+	my $response = $userAgent->request( GET $oaRequest->to_url() );
+	if( $response->is_success() ) {
+		my $tweet = from_json( $response->content );
+		tweetToNum( $tweet );
+	} else {
+		warn( "Something bad happened: ".$response->status_line() );
+		if( $response->code == "401" ) {
+			warn( "More specifically, it was a 401- this usually means $0 was de-authorized." );
+			print( STDERR "If you think this might be the case, please try deleting ".$ENV{"HOME"}."/.twipper.secret and running me again.\n" );
+		} elsif( $response->code >= 400 && $response->code < 500 ) {
+			warn( "400-series response code indicates a problem with this request" );
+			print( STDERR $response->content );
+		}
+	}
+	return $response->code();
+}

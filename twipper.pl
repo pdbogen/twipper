@@ -58,6 +58,7 @@ my $shortenLengthHttp=-1;
 my $shortenLengthHttps=-1;
 my $maxMediaSize=-1;
 my $user=undef;
+my $image=undef;
 
 GetOptions(
 	"count|c=i" => \$count,
@@ -72,6 +73,7 @@ GetOptions(
 	"dry-run|n" => \$dryrun,
 	"one-shot|1" => \$oneshot,
 	"user|u=s" => \$user,
+	"image=s" => \$image,
 ) or usage();
 
 if( $oneshot && $window==0 ) {
@@ -82,6 +84,12 @@ if( $oneshot && $window==0 ) {
 
 if( $twoline && $wrap==0 ) {
 	warn( "--twoline requires setting a wrap length with --wrap" );
+	usage();
+	exit 1;
+}
+
+if( ($fetch == 1 || $window == 1) && defined $image ) {
+	warn( "--image doesn't make sense with --fetch or --window" );
 	usage();
 	exit 1;
 }
@@ -117,7 +125,7 @@ if( $fetch == 1 ) {
 } elsif( $window == 1 ) {
 	exit runWindowed();
 } else {
-	exit tweet();
+	exit tweet( undef, undef, $image );
 }
 
 #
@@ -556,12 +564,12 @@ sub getAuth {
 		$token = $oaResponse->token;
 		$token_secret = $oaResponse->token_secret;
 
-		store [ $token, $token_secret ], $ENV{"HOME"}."/.twipper.secret" or
+		store [ $token, $token_secret ], $ENV{"HOME"}."/.twipper.secret".$user or
 			die( "Ack! I couldn't save your oauth tokens: $!" );
 
 		print( "Excellent! We're on our way. You shouldn't have to do this again.\n" );
 	} else {
-		my $arr = retrieve( $ENV{"HOME"}."/.twipper.secret" ) or
+		my $arr = retrieve( $ENV{"HOME"}."/.twipper.secret".$user ) or
 			die( "Ack! I couldn't retrieve your oauth tokens: $!" );
 		( $token, $token_secret ) = @$arr;
 	}
@@ -571,7 +579,8 @@ sub getAuth {
 sub tweet {
 	my $status = shift;
 	my $reply = (shift or undef);
-	if( !$status ) {
+	my $image = (shift or undef);
+	if( !$status || !defined $status) {
 		if( scalar @ARGV > 0 ) {
 			$status = join( ' ', @ARGV );
 		} else {
@@ -586,12 +595,79 @@ sub tweet {
 	}
 
 	# Calculate length, retrieving the config info in blocking mode if necessary
-	my $len = calculateLength( $status, 1 );
+	my $len;
+	if( defined( $image ) ) {
+		$len = calculateLength( $status, 1 ) + $shortenLengthHttps;
+	} else {
+		$len = calculateLength( $status, 1 );
+	}
+
 	if( $len > 140 ) {
 		print( STDERR "Oops! The tweet may not exceed the 140-character limit. You went over by ".($len - 140), "\n" );
 		return 0;
 	}
+	if( defined( $image ) ) {
+		return tweetImage( $status, $reply, $image );
+	} else {
+		return tweetPlain( $status, $reply );
+	}
+}
 
+sub tweetImage {
+	my $status = shift;
+	my $reply = (shift or undef);
+	my $image = (shift or undef);
+	my $imagename = (split('/',$image))[-1];
+	my $extra = {
+		status => $status
+	};
+
+	if( defined( $reply ) ) {
+		$extra->{ "in_reply_to_status_id" } = $reply;
+	}
+
+#	$extra->{ "media[]" } = [ $image, $imagename ];
+
+	my $oaRequest = Net::OAuth->request( "protected resource" )->new(
+		consumer_key     => $consumer_key,
+		consumer_secret  => $consumer_secret,
+		request_url      => 'https://api.twitter.com/1.1/statuses/update_with_media.json',
+		request_method   => 'POST',
+		signature_method => 'HMAC-SHA1',
+		timestamp        => time,
+		nonce            => sha256_hex( rand ),
+		token            => $token,
+		token_secret     => $token_secret,
+		extra_params     => $extra,
+	);
+
+	$oaRequest->sign();
+
+	if( $dryrun ) {
+		print( "Not actually tweeting.\n" );
+		return 1;
+	} else {
+		my $req = POST $oaRequest->to_url(),
+			Content_Type => 'form-data',
+			Content => [
+				'media[]' => [ $image, $imagename ]
+			];
+		my $response = $userAgent->request( $req );
+		if( !$response->is_success() ) {
+			warn( "Something bad happened: ".$response->status_line() );
+			if( $response->code == "401" ) {
+				warn( "More specifically, it was a 401- this usually means $0 was de-authorized." );
+				print( STDERR "If you think this might be the case, please try deleting ".$ENV{"HOME"}."/.twipper.secret and running me again.\n" );
+			}
+			return 0;
+		}
+		return 1;
+	}
+}
+
+sub tweetPlain {
+	my $status = shift;
+	my $reply = (shift or undef);
 	my $extra = {
 		status => $status
 	};
@@ -658,6 +734,8 @@ sub usage {
 	print( "                     that point.\n\n" );
 	print( "    -u, --user <id>  Specify a different profile than the default. ID is whatever\n" );
 	print( "                     you want; it doesn't need to be the Twitter handle.\n" );
+	print( "        --image <f>  Attach an image to the tweet! Required to be a JPEG, PNG, or\n" );
+	print( "                     non-animated GIF. Client currently has no checks...\n" );
 	print( "If no flags are specified, the arguments will be joined with a space and posted to twitter.\n\n" );
 	print( "The first time it's run, the script will automatically guide the user through the prompts necessary to authorize the client to post and/or retrieve.\n\n" );
 	print( "NOTE: The OAuth protocol requires an accurate system clock. If your clock is too far off from Twitter's clock, authorization might fail, either consistently or intermittently. If you're having a problem like this, please try syncing your clock to an NTP server.\n\n" );

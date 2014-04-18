@@ -56,6 +56,7 @@ my $dryrun=0;
 my $oneshot=0;
 my $shortenLengthHttp=-1;
 my $shortenLengthHttps=-1;
+my $maxMediaSize=-1;
 my $user=undef;
 
 GetOptions(
@@ -188,6 +189,7 @@ sub updateConfigInfo {
 		my $response_data = decode_json $response->content();
 		$shortenLengthHttp = $response_data->{ "short_url_length" };
 		$shortenLengthHttps = $response_data->{ "short_url_length_https" };
+		$maxMediaSize = $response_data->{ "photo_size_limit" };
 	}
 }
 

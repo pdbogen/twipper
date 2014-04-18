@@ -56,6 +56,7 @@ my $dryrun=0;
 my $oneshot=0;
 my $shortenLengthHttp=-1;
 my $shortenLengthHttps=-1;
+my $user=undef;
 
 GetOptions(
 	"count|c=i" => \$count,
@@ -69,6 +70,7 @@ GetOptions(
 	"drawlines" => \$drawlines,
 	"dry-run|n" => \$dryrun,
 	"one-shot|1" => \$oneshot,
+	"user|u=s" => \$user,
 ) or usage();
 
 if( $oneshot && $window==0 ) {
@@ -102,7 +104,7 @@ if( $blank == 1 ) {
 
 my $userAgent = LWP::UserAgent->new();
 
-my( $token, $token_secret ) = getAuth();
+my( $token, $token_secret ) = getAuth( $user );
 
 my $tweetVar = "";
 my $tweetLabel = "(0/140)";
@@ -479,10 +481,16 @@ sub tweetFromGUI {
 
 sub getAuth {
 	my( $token, $token_secret );
+	my $user = shift;
+	if( defined $user ) {
+		$user = ".$user";
+	} else {
+		$user = "";
+	}
 
-	if( ! -e $ENV{"HOME"}."/.twipper.secret" ) {
+	if( ! -e $ENV{"HOME"}."/.twipper.secret".$user ) {
 		print( "You have not yet configured $0. Would you like to do so now? ([Y]/n) " );
-		my $response = <>;
+		my $response = <STDIN>;
 		chomp $response if( $response );
 		unless( !$response || $response =~ m/^y?$/i ) {
 			print( "Too bad. See you later!\n" );
@@ -519,7 +527,7 @@ sub getAuth {
 		print( "Okay, got it! Next, you need to visit this URL to grant me write access to your twitter account:\n\n" );
 		print( "http://api.twitter.com/oauth/authorize?oauth_token=$token\n\n" );
 		print( "You should receive a PIN once you select 'Allow'. Please enter that PIN: " );
-		$response = <>;
+		$response = <STDIN>;
 		chomp $response if( $response );
 
 		$oaRequest = Net::OAuth->request( "access token" )->new(
@@ -567,7 +575,7 @@ sub tweet {
 		} else {
 			if( $stdin ) {
 				print( "Reading tweet from STDIN...\n" );
-				$status = <>;
+				$status = <STDIN>;
 				chomp $status;
 			} else {
 				usage();
@@ -646,6 +654,8 @@ sub usage {
 	print( "                     assumably, the user is away from his or her terminal.\n" );
 	print( "    -n, --dry-run    Don't actually tweet, or whatever. Do everything up until\n" );
 	print( "                     that point.\n\n" );
+	print( "    -u, --user <id>  Specify a different profile than the default. ID is whatever\n" );
+	print( "                     you want; it doesn't need to be the Twitter handle.\n" );
 	print( "If no flags are specified, the arguments will be joined with a space and posted to twitter.\n\n" );
 	print( "The first time it's run, the script will automatically guide the user through the prompts necessary to authorize the client to post and/or retrieve.\n\n" );
 	print( "NOTE: The OAuth protocol requires an accurate system clock. If your clock is too far off from Twitter's clock, authorization might fail, either consistently or intermittently. If you're having a problem like this, please try syncing your clock to an NTP server.\n\n" );

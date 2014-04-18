@@ -527,7 +527,7 @@ sub getAuth {
 		$token_secret = $oaResponse->token_secret;
 
 		print( "Okay, got it! Next, you need to visit this URL to grant me write access to your twitter account:\n\n" );
-		print( "http://api.twitter.com/oauth/authorize?oauth_token=$token\n\n" );
+		print( "https://api.twitter.com/oauth/authorize?oauth_token=$token\n\n" );
 		print( "You should receive a PIN once you select 'Allow'. Please enter that PIN: " );
 		$response = <STDIN>;
 		chomp $response if( $response );

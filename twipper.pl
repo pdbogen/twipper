@@ -146,6 +146,7 @@ sub runWindowed {
 		"go" => [ \&validateGo, \&tweetGo ],
 		"fave" => [ \&validateFave, \&tweetFave ],
 		"favorite" => [ \&validateFave, \&tweetFave ],
+		"ort" => [ \&validateOldRetweet, \&tweetOldRetweet ],
 	);
 
 	my $rootWindow = MainWindow->new;
@@ -270,6 +271,10 @@ sub tweetGo {
 }
 
 
+sub validateOldRetweet {
+	return validateRetweet( @_, "OldRT" );
+}
+
 sub validateFave {
 	return validateRetweet( @_, "FAVE" );
 }
@@ -340,6 +345,22 @@ sub tweetFave {
 		$tweetLabel = "ERROR $result";
 		return 0;
 	}
+}
+
+sub tweetOldRetweet {
+	my $content = shift;
+	my( $cmd, $num, $text ) = split( / /, $content, 3 );
+	my $tweet = numToTweet( $num );
+	unless( $tweet ) {
+		$tweetLabel = "Bad Tweet Number";
+		return 0;
+	}
+
+	$tweetVar = "RT @".$tweet->{ "user" }->{ "name" }." ".$tweet->{ "text" }." ";
+	my $xview = $tweetEntry->xview();
+	$tweetEntry->icursor( length $tweetVar );
+	$tweetEntry->xviewMoveto( 1.0-($xview->[1] - $xview->[0]) );
+	return 0;
 }
 
 sub tweetRetweet {

@@ -356,7 +356,7 @@ sub tweetOldRetweet {
 		return 0;
 	}
 
-	$tweetVar = "RT @".$tweet->{ "user" }->{ "name" }." ".$tweet->{ "text" }." ";
+	$tweetVar = "RT @".$tweet->{ "user" }->{ "screen_name" }." ".$tweet->{ "text" }." ";
 	my $xview = $tweetEntry->xview();
 	$tweetEntry->icursor( length $tweetVar );
 	$tweetEntry->xviewMoveto( 1.0-($xview->[1] - $xview->[0]) );

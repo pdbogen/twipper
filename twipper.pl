@@ -444,14 +444,20 @@ sub tweetRetweet {
 sub validateReply {
 	my $content = shift;
 	my( $cmd, $num, $text ) = split( / /, $content, 3 );
-	my $tweet = numToTweet( id => $num );
+	my $origTweet = numToTweet( id => $num );
+	my $tweet = numToTweet( id => $num, indirect => 1 );
+
+	# Replying to retweets is complex.
+	# Our choice is to reply to the retweeter, but we must be referring to the
+	# ID of the referenced tweet, not the ID of the native retweet.
+
 	if( $tweet ) {
 		my $id = $tweet->{ "id" };
-		my $len = 2+length( $tweet->{ "user" }->{ "screen_name" } ); # "@" <screen_name> " "
+		my $len = 2+length( $origTweet->{ "user" }->{ "screen_name" } ); # "@" <screen_name> " "
 		if( $text ) {
 			$len += calculateLength( $text, 0 );
 		}
-		$tweetLabel = sprintf( "@%s (%d/140)", $tweet->{ "user" }->{ "screen_name" }, $len );
+		$tweetLabel = sprintf( "@%s (%d/140)", $origTweet->{ "user" }->{ "screen_name" }, $len );
 		if( $len <= 140 ) {
 			return 1;
 		}

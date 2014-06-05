@@ -428,6 +428,7 @@ sub tweetRetweet {
 		my $response = $userAgent->request( POST $oaRequest->to_url() );
 		if( !$response->is_success() ) {
 			warn( "Something bad happened: ".$response->status_line() );
+			$tweetLabel = "ERR ".$response->status_line();
 			if( $response->code == "401" ) {
 				warn( "More specifically, it was a 401- this usually means $0 was de-authorized." );
 				print( STDERR "If you think this might be the case, please try deleting ".$ENV{"HOME"}."/.twipper.secret and running me again.\n" );

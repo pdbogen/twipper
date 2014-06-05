@@ -918,6 +918,8 @@ sub numToTweet {
 			return undef;
 	}
 
+	return undef unless exists $buffer->{ $num };
+
 	if( $indirect == 1 && exists $buffer->{ $num }->[1]->{ "retweeted_status" } ) {
 		return $buffer->{ $num }->[1]->{ "retweeted_status" };
 	}

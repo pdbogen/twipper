@@ -242,7 +242,7 @@ sub validateGo {
 
 	# validate tweet #
 	return 1 if $num eq "";
-	my $tweet = numToTweet( $num );
+	my $tweet = numToTweet( id => $num );
 	my @urls = ( @{$tweet->{ "entities" }->{ "urls" }}, grep { exists $_->{ "url" } } @{$tweet->{ "entities" }->{ "media" }} );
 	return 0 unless defined $tweet;
 
@@ -272,7 +272,7 @@ sub tweetGo {
 	return 0 unless validateGo( $content );
 
 	# Locate tweet, parse URLs out (embedded URLs + media)
-	my $tweet = numToTweet( $num );
+	my $tweet = numToTweet( id => $num );
 	my @urls = ( @{$tweet->{ "entities" }->{ "urls" }}, grep { exists $_->{ "url" } } @{$tweet->{ "entities" }->{ "media" }} );
 
 	# This doesn't always fail for validateGo, but should fail here
@@ -315,7 +315,7 @@ sub validateRetweet {
 	}
 	return 0 if $content =~ m/^[^ ]+ [0-9]+ .*$/;
 
-	my $tweet = numToTweet( $num );
+	my $tweet = numToTweet( id => $num, indirect => 1 );
 	if( $tweet ) {
 		my $id = $tweet->{ "id" };
 		$tweetLabel = sprintf( "%s @%s", $action, $tweet->{ "user" }->{ "screen_name" } );
@@ -341,9 +341,9 @@ sub tweetFave {
 
 	# Weird looking code. Get the tweet ID from the buffer, refresh the tweet
 	# (so we have the latest fave info), and then re-fetch from the buffer.
-	my $tweet = numToTweet( $num );
+	my $tweet = numToTweet( id => $num );
 	$tweet = refreshTweet( $tweet->{ "id" } );
-	$tweet = numToTweet( $num );
+	$tweet = numToTweet( id => $num, indirect => 1 );
 
 	unless( $tweet ) {
 		$tweetLabel = "Bad Tweet Number";
@@ -372,7 +372,7 @@ sub tweetFave {
 sub tweetOldRetweet {
 	my $content = shift;
 	my( $cmd, $num, $text ) = split( / /, $content, 3 );
-	my $tweet = numToTweet( $num );
+	my $tweet = numToTweet( id => $num, indirect => 1 );
 	unless( $tweet ) {
 		$tweetLabel = "Bad Tweet Number";
 		return 0;
@@ -388,7 +388,7 @@ sub tweetOldRetweet {
 sub tweetRetweet {
 	my $content = shift;
 	my( $cmd, $num, $text ) = split( / /, $content, 3 );
-	my $tweet = numToTweet( $num );
+	my $tweet = numToTweet( id => $num, indirect => 1 );
 	unless( $tweet ) {
 		$tweetLabel = "Bad Tweet Number";
 		return 0;
@@ -438,7 +438,7 @@ sub tweetRetweet {
 sub validateReply {
 	my $content = shift;
 	my( $cmd, $num, $text ) = split( / /, $content, 3 );
-	my $tweet = numToTweet( $num );
+	my $tweet = numToTweet( id => $num );
 	if( $tweet ) {
 		my $id = $tweet->{ "id" };
 		my $len = 2+length( $tweet->{ "user" }->{ "screen_name" } ); # "@" <screen_name> " "
@@ -463,10 +463,10 @@ sub validateReply {
 sub tweetReply {
 	my $content = shift;
 	my( $cmd, $num, $text ) = split( / /, $content, 3 );
-	my $tweet = numToTweet( $num );
 	if( !defined $text || length( $text ) <= 0 ) {
 		return 0;
 	}
+	my $tweet = numToTweet( id => $num );
 	unless( defined $tweet ) {
 		$tweetLabel = "Bad Tweet Number";
 		return 0;
@@ -894,13 +894,20 @@ sub fetch {
 sub numToTweet {
 	state $mtime = 0;
 	state $buffer = undef;
-	my $num = shift;
-	return undef unless defined $num && $num =~ /^[0-9]+$/;
+	my %args = @_;
+	unless( exists( $args{ "id" } ) )  { die( "numToTweet called with named parameters but no 'id' parameter" ); }
+	unless( $args{ "id" } =~ /^\d+$/ ) { return undef; }
+	my $num = $args{ "id" };
+	my $indirect = $args{ "indirect" } || 0;
 
 	my $file_mtime = (stat( $ENV{"HOME"}."/.twipper.refs" ))[9] ;
 	if( $file_mtime > $mtime ) {
 		$buffer = retrieve( $ENV{"HOME"}."/.twipper.refs" ) or
 			return undef;
+	}
+
+	if( $indirect == 1 && exists $buffer->{ $num }->[1]->{ "retweeted_status" } ) {
+		return $buffer->{ $num }->[1]->{ "retweeted_status" };
 	}
 	return $buffer->{ $num }->[1];
 }

@@ -167,6 +167,7 @@ sub runWindowed {
 		$tweetEntry->font( "configure", "entryFont", "-size", -1 * ( $root->height - 13 ) );
 		$tweetEntry->place( -width => ($root->width - $label->Width) );
 	}, $rootWindow, $tweetEntry, $label ] );
+	$rootWindow->after( 500, sub { updateConfigInfo() } );
 	Tk::MainLoop();
 }
 

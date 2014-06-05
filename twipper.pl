@@ -442,6 +442,9 @@ sub tweetReply {
 	my $content = shift;
 	my( $cmd, $num, $text ) = split( / /, $content, 3 );
 	my $tweet = numToTweet( $num );
+	if( !defined $text || length( $text ) <= 0 ) {
+		return 0;
+	}
 	unless( defined $tweet ) {
 		$tweetLabel = "Bad Tweet Number";
 		return 0;

@@ -59,6 +59,7 @@ my $shortenLengthHttps=-1;
 my $maxMediaSize=-1;
 my $user=undef;
 my $image=undef;
+my $twitter_profile = undef;
 
 GetOptions(
 	"count|c=i" => \$count,
@@ -200,6 +201,26 @@ sub updateConfigInfo {
 		$shortenLengthHttps = $response_data->{ "short_url_length_https" };
 		$maxMediaSize = $response_data->{ "photo_size_limit" };
 	}
+
+	$oaRequest = Net::OAuth->request( "protected resource" )->new(
+		consumer_key     => $consumer_key,
+		consumer_secret  => $consumer_secret,
+		request_url      => 'https://api.twitter.com/1.1/account/verify_credentials.json',
+		request_method   => 'GET',
+		signature_method => 'HMAC-SHA1',
+		timestamp        => time,
+		nonce            => sha256_hex( rand ),
+		token            => $token,
+		token_secret     => $token_secret,
+		);
+	$oaRequest->sign();
+	$response = $userAgent->request( GET $oaRequest->to_url() );
+	if( !$response->is_success() ) {
+		warn( "Failed to retrieve account information; this shouldn't have a substantial negative impact: ".$response->status_line() );
+	} else {
+		$twitter_profile = decode_json $response->content();
+	}
+
 }
 
 sub clearFromGUI {

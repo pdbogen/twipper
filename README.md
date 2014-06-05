@@ -8,6 +8,10 @@ Requirements
 Net::OAuth (libnet-oauth-perl)
 LWP (libwww-perl)
 JSON (libjson-perl)
+Module::Load::Conditional (libmodule-load-conditional-perl)
+Digest::SHA (libdigest-sha-perl)
+Date::Calc (libdate-calc-perl)
+Math::Random::Secure (not available in Debian; I like cpanminus, which seems faster and easier to use than cpan)
 
 And, if you want to use the GUI mode,
 Tk (perl-tk)

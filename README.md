@@ -14,7 +14,7 @@ Tk (perl-tk)
 
 LICENSE
 =======
-Copyright 2013 Patrick Bogen
+Copyright 2013-2014 Patrick Bogen
 
 This file is part of twipper.
 

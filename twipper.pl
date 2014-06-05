@@ -394,6 +394,11 @@ sub tweetRetweet {
 		return 0;
 	}
 
+	if( $tweet->{ "user" }->{ "id" } == $twitter_profile->{ "id" } ) {
+		$tweetLabel = "Cannot retweet self";
+		return 0;
+	}
+
 	my $id = $tweet->{ "id" };
 
 	my $extra = {

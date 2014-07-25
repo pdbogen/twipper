@@ -483,10 +483,11 @@ sub mentionsForReply {
 	my %args = @_;
 	my $num = $args{ "id" };
 
-	die( "mentionsForReply called with invalid tweet number ($num); number should be validated before calling" )
-		unless( defined $num );
-
 	my $reply_tweet  = numToTweet( id => $num );
+
+	die( "mentionsForReply called with invalid tweet number ($num); number should be validated before calling" )
+		unless( defined $num && defined $reply_tweet );
+
 	my $reply_author = $reply_tweet->{ "user" }->{ "screen_name" };
 
 	my $retweeted_tweet  = numToTweet( id => $num, indirect => 1 );

@@ -513,7 +513,7 @@ sub tweetReply {
 		return 0;
 	}
 	$tweetVar = "";
-	return tweet( mentionsForReply( id => $num )." $text", $tweet->{ "id" } );
+	return tweet( $text, $num );
 }
 
 

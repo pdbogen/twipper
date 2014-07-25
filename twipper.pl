@@ -670,14 +670,15 @@ sub tweet {
 	if( !$status || !defined $status) {
 		if( scalar @ARGV > 0 ) {
 			$status = join( ' ', @ARGV );
+		} elsif( $stdin ) {
+			print( "Reading tweet from STDIN...\n" );
+			$status = <STDIN>;
+			chomp $status;
+		} elsif( $image ) {
+			print( "Bare image tweet...\n" );
+			$status = "";
 		} else {
-			if( $stdin ) {
-				print( "Reading tweet from STDIN...\n" );
-				$status = <STDIN>;
-				chomp $status;
-			} else {
-				usage();
-			}
+			usage();
 		}
 	}
 

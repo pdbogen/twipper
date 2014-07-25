@@ -472,6 +472,27 @@ sub validateReply {
 	}
 }
 
+sub mentionsForReply {
+	my %args = @_;
+	my $num = $args{ "id" };
+
+	die( "mentionsForReply called with invalid tweet number ($num); number should be validated before calling" )
+		unless( defined $num );
+
+	my $reply_tweet  = numToTweet( id => $num );
+	my $reply_author = $reply_tweet->{ "user" }->{ "screen_name" };
+
+	my $retweeted_tweet  = numToTweet( id => $num, indirect => 1 );
+	my $retweeted_author = $retweeted_tweet->{ "user" }->{ "screen_name" };
+
+	my $result = "@".$reply_author;
+	if( $reply_author ne $retweeted_author ) {
+		$result .= " @".$retweeted_author;
+	}
+
+	return $result;
+}
+
 sub tweetReply {
 	my $content = shift;
 	my( $cmd, $num, $text ) = split( / /, $content, 3 );
@@ -484,7 +505,7 @@ sub tweetReply {
 		return 0;
 	}
 	$tweetVar = "";
-	return tweet( "@".($tweet->{ "user" }->{ "screen_name" })." $text", $tweet->{ "id" } );
+	return tweet( mentionsForReply( id => $num )." $text", $tweet->{ "id" } );
 }
 
 

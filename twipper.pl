@@ -60,6 +60,7 @@ my $maxMediaSize=-1;
 my $user=undef;
 my $image=undef;
 my $twitter_profile = undef;
+my $reply=undef;
 
 GetOptions(
 	"count|c=i" => \$count,
@@ -75,6 +76,7 @@ GetOptions(
 	"one-shot|1" => \$oneshot,
 	"user|u=s" => \$user,
 	"image=s" => \$image,
+	"reply|r=i" => \$reply,
 ) or usage();
 
 if( $oneshot && $window==0 ) {
@@ -112,6 +114,11 @@ if( $blank == 1 ) {
 	exit if `xset q` =~ m/Monitor is Off/i;
 }
 
+if( $reply && !numToTweet( id => $reply) ) {
+	warn( "--reply doesn't refer to a valid tweet" );
+	exit 1;
+}
+
 my $userAgent = LWP::UserAgent->new();
 
 my( $token, $token_secret ) = getAuth( $user );
@@ -126,7 +133,7 @@ if( $fetch == 1 ) {
 } elsif( $window == 1 ) {
 	exit runWindowed();
 } else {
-	exit tweet( undef, undef, $image );
+	exit tweet( undef, $reply, $image );
 }
 
 #
@@ -658,6 +665,7 @@ sub getAuth {
 sub tweet {
 	my $status = shift;
 	my $reply = (shift or undef);
+	my $reply_id = undef;
 	my $image = (shift or undef);
 	if( !$status || !defined $status) {
 		if( scalar @ARGV > 0 ) {
@@ -673,6 +681,11 @@ sub tweet {
 		}
 	}
 
+	if( $reply ) {
+		$status = mentionsForReply( id => $reply )." ".$status;
+		$reply_id = numToTweet( id => $reply, indirect => 1)->{ "id" };
+	}
+
 	# Calculate length, retrieving the config info in blocking mode if necessary
 	my $len;
 	if( defined( $image ) ) {
@@ -686,9 +699,9 @@ sub tweet {
 		return 0;
 	}
 	if( defined( $image ) ) {
-		return tweetImage( $status, $reply, $image );
+		return tweetImage( $status, $reply_id, $image );
 	} else {
-		return tweetPlain( $status, $reply );
+		return tweetPlain( $status, $reply_id );
 	}
 }
 
@@ -815,6 +828,7 @@ sub usage {
 	print( "                     you want; it doesn't need to be the Twitter handle.\n" );
 	print( "        --image <f>  Attach an image to the tweet! Required to be a JPEG, PNG, or\n" );
 	print( "                     non-animated GIF. Client currently has no checks...\n" );
+	print( "    -r, --reply <id> Reply to the indicated tweet. IDs are shown in --fetch.\n" );
 	print( "If no flags are specified, the arguments will be joined with a space and posted to twitter.\n\n" );
 	print( "The first time it's run, the script will automatically guide the user through the prompts necessary to authorize the client to post and/or retrieve.\n\n" );
 	print( "NOTE: The OAuth protocol requires an accurate system clock. If your clock is too far off from Twitter's clock, authorization might fail, either consistently or intermittently. If you're having a problem like this, please try syncing your clock to an NTP server.\n\n" );

@@ -490,7 +490,7 @@ sub mentionsForReply {
 
 	my $reply_author = $reply_tweet->{ "user" }->{ "screen_name" };
 
-	my $retweeted_tweet  = numToTweet( id => $num, indirect => 1 );
+	my $retweeted_tweet  = (numToTweet( id => $num, indirect => 1 ) or $reply_tweet);
 	my $retweeted_author = $retweeted_tweet->{ "user" }->{ "screen_name" };
 
 	my $result = "@".$reply_author;

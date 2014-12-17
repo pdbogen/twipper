@@ -54,6 +54,7 @@ my $twoline=0;
 my $drawlines=0;
 my $dryrun=0;
 my $oneshot=0;
+my $verbose=0;
 my $shortenLengthHttp=-1;
 my $shortenLengthHttps=-1;
 my $maxMediaSize=-1;
@@ -77,6 +78,7 @@ GetOptions(
 	"user|u=s" => \$user,
 	"image=s" => \$image,
 	"reply|r=i" => \$reply,
+	"verbose|v" => \$verbose,
 ) or usage();
 
 if( $oneshot && $window==0 ) {
@@ -691,9 +693,13 @@ sub tweet {
 	# Calculate length, retrieving the config info in blocking mode if necessary
 	my $len;
 	if( defined( $image ) ) {
-		$len = calculateLength( $status, 1 ) + $shortenLengthHttps;
+		updateConfigInfo();
+		warn( "unable to retrieve shortenLengthHttps, no idea how long image URL will be." ) if ($shortenLengthHttps == -1 );
+		$len = calculateLength( $status, 1 ) + $shortenLengthHttps + 1;
+		print( "length with image is $len\n" ) if $verbose;
 	} else {
 		$len = calculateLength( $status, 1 );
+		print( "length without image is $len\n" ) if $verbose;
 	}
 
 	if( $len > 140 ) {
@@ -749,6 +755,9 @@ sub tweetImage {
 		my $response = $userAgent->request( $req );
 		if( !$response->is_success() ) {
 			warn( "Something bad happened: ".$response->status_line() );
+			if( $verbose ) {
+				warn( $response->content );
+			}
 			if( $response->code == "401" ) {
 				warn( "More specifically, it was a 401- this usually means $0 was de-authorized." );
 				print( STDERR "If you think this might be the case, please try deleting ".$ENV{"HOME"}."/.twipper.secret and running me again.\n" );
@@ -831,6 +840,8 @@ sub usage {
 	print( "        --image <f>  Attach an image to the tweet! Required to be a JPEG, PNG, or\n" );
 	print( "                     non-animated GIF. Client currently has no checks...\n" );
 	print( "    -r, --reply <id> Reply to the indicated tweet. IDs are shown in --fetch.\n" );
+	print( "    -v, --verbose    Produce (some) extra output, helpful for debugging strange\n" );
+	print( "                     issues.\n" );
 	print( "If no flags are specified, the arguments will be joined with a space and posted to twitter.\n\n" );
 	print( "The first time it's run, the script will automatically guide the user through the prompts necessary to authorize the client to post and/or retrieve.\n\n" );
 	print( "NOTE: The OAuth protocol requires an accurate system clock. If your clock is too far off from Twitter's clock, authorization might fail, either consistently or intermittently. If you're having a problem like this, please try syncing your clock to an NTP server.\n\n" );

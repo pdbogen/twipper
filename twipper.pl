@@ -26,6 +26,8 @@ use strict;
 
 use feature "state";
 
+use utf8;
+
 use Module::Load::Conditional qw( can_load );
 use Net::OAuth;
 $Net::OAuth::PROTOCOL_VERSION = Net::OAuth::PROTOCOL_VERSION_1_0A;
@@ -184,8 +186,12 @@ sub updateConfigInfo {
 
 	# Only update once an hour.
 	state $lastUpdate = 0;
-	return unless time > ($lastUpdate+3600);
+	if( time < ($lastUpdate+3600) ) {
+	  print( "stored configuration is up-to-date, skipping update" ) if $verbose;
+	  return;
+	}
 	$lastUpdate = time;
+	print( "Request configuration update...\n" ) if $verbose;
 	my $oaRequest = Net::OAuth->request( "protected resource" )->new(
 		consumer_key     => $consumer_key,
 		consumer_secret  => $consumer_secret,
@@ -207,6 +213,7 @@ sub updateConfigInfo {
 		warn( "Failed to retrieve configuration information from twitter; cannot discern the shortened length of URLs. URLs will not be handled specially." );
 	} else {
 		my $response_data = decode_json $response->content();
+		print( "Configuration retrieved: ".$response->content(), "\n" ) if $verbose;
 		$shortenLengthHttp = $response_data->{ "short_url_length" };
 		$shortenLengthHttps = $response_data->{ "short_url_length_https" };
 		$maxMediaSize = $response_data->{ "photo_size_limit" };
@@ -674,11 +681,12 @@ sub tweet {
 		if( scalar @ARGV > 0 ) {
 			$status = join( ' ', @ARGV );
 		} elsif( $stdin ) {
-			print( "Reading tweet from STDIN...\n" );
+			print( "Reading tweet from STDIN...\n" ) if $verbose;
 			$status = <STDIN>;
 			chomp $status;
 		} elsif( $image ) {
-			print( "Bare image tweet...\n" );
+		  die( "file not found: $image" ) unless -e $image;
+			print( "Bare image tweet...\n" ) if $verbose;
 			$status = "";
 		} else {
 			usage();
@@ -695,6 +703,10 @@ sub tweet {
 	if( defined( $image ) ) {
 		updateConfigInfo();
 		warn( "unable to retrieve shortenLengthHttps, no idea how long image URL will be." ) if ($shortenLengthHttps == -1 );
+		my(undef,undef,undef,undef,undef,undef,undef,$size) = stat( $image );
+		if( $maxMediaSize > -1 && $size > $maxMediaSize ) {
+		  die( "image $image size $size greater than max media size $maxMediaSize, not attempting to tweet" );
+		}
 		$len = calculateLength( $status, 1 ) + $shortenLengthHttps + 1;
 		print( "length with image is $len\n" ) if $verbose;
 	} else {
@@ -912,6 +924,7 @@ sub fetch {
 	print( ($hsep)x($namelen-2).$isect.($hsep)x($wrap-$namelen+1)."\n" ) if $drawlines;
 
 	for my $tweet (@$content) {
+	  print( STDERR to_json($tweet), "\n" ) if $verbose;
 		my @date = split( / /, $tweet->{ "created_at" } );
 		my $line = "";
 		my $delta;

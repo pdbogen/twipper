@@ -871,7 +871,7 @@ sub fetch {
 	my $oaRequest = Net::OAuth->request( "protected resource" )->new(
 		consumer_key     => $consumer_key,
 		consumer_secret  => $consumer_secret,
-		request_url      => 'https://api.twitter.com/1.1/statuses/home_timeline.json?count='.$count,
+		request_url      => 'https://api.twitter.com/1.1/statuses/home_timeline.json?tweet_mode=extended&count='.$count,
 		request_method   => 'GET',
 		signature_method => 'HMAC-SHA1',
 		timestamp        => time,
@@ -894,6 +894,7 @@ sub fetch {
 		}
 		exit 1;
 	}
+
 	my $content = from_json( $response->content );
 	my @now = System_Clock(1);
 
@@ -939,12 +940,12 @@ sub fetch {
 		} else {
 			$delta = sprintf( "%2ds", $date[3] );
 		}
-		$tweet->{ 'text' } =~ s/&lt;/</gi;
-		$tweet->{ 'text' } =~ s/&gt;/>/gi;
-		$tweet->{ 'text' } =~ s/&amp;/&/gi;
-		$tweet->{ 'text' } =~ s/\n/ /gs;
+		$tweet->{ 'full_text' } =~ s/&lt;/</gi;
+		$tweet->{ 'full_text' } =~ s/&gt;/>/gi;
+		$tweet->{ 'full_text' } =~ s/&amp;/&/gi;
+		$tweet->{ 'full_text' } =~ s/\n/ /gs;
 		if( $twoline ) {
-			my @lines = split( /\n/s, Text::Wrap::wrap( "", "", $tweet->{ 'text' } ) );
+			my @lines = split( /\n/s, Text::Wrap::wrap( "", "", $tweet->{ 'full_text' } ) );
 			printf( "%".($namelen-1)."s%s\n", $tweet->{ 'user' }->{ 'screen_name' }.$vsep, shift @lines );
 			printf( "%".($namelen-2)."s".$vsep."%s\n", $delta." ago", ($lines[0]?shift @lines:"") );
 			printf( "%".($namelen-2)."s".$vsep."%s\n", ($tweet->{ "favorited" }?"*":" ")." #".$num, ($lines[0]?shift @lines:"") );
@@ -953,7 +954,7 @@ sub fetch {
 			}
 			print( ($hsep)x($namelen-2).$isect.($hsep)x($wrap-$namelen+1)."\n" );
 		} else {
-			$line = sprintf( "%s %".$numlen."s, $delta ago, %".$namelen."s%s\n", $tweet->{ "favorited" }?"*":" ", "#".$num, $tweet->{ 'user' }->{ 'screen_name' }.": ", $tweet->{ 'text' } );
+			$line = sprintf( "%s %".$numlen."s, $delta ago, %".$namelen."s%s\n", $tweet->{ "favorited" }?"*":" ", "#".$num, $tweet->{ 'user' }->{ 'screen_name' }.": ", $tweet->{ 'full_text' } );
 			if( $wrap != 0 ) {
 				print( Text::Wrap::wrap( "", " " x $indent, $line ) );
 			} else {

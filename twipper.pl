@@ -948,7 +948,7 @@ sub fetch {
 			my @lines = split( /\n/s, Text::Wrap::wrap( "", "", $tweet->{ 'full_text' } ) );
 			printf( "%".($namelen-1)."s%s\n", $tweet->{ 'user' }->{ 'screen_name' }.$vsep, shift @lines );
 			printf( "%".($namelen-2)."s".$vsep."%s\n", $delta." ago", ($lines[0]?shift @lines:"") );
-			printf( "%".($namelen-2)."s".$vsep."%s\n", ($tweet->{ "favorited" }?"*":" ")." #".$num, ($lines[0]?shift @lines:"") );
+			printf( "%".($namelen-2)."s".$vsep."%s\n", ($tweet->{ "favorited" }?"*":" ").($tweet->{ "retweeted" }?"↻":" ")." #".$num, ($lines[0]?shift @lines:"") );
 			for my $line( @lines ) {
 				print( " "x($namelen-2).$vsep."$line\n" );
 			}

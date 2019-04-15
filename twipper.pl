@@ -858,7 +858,7 @@ sub usage {
 	print( "The first time it's run, the script will automatically guide the user through the prompts necessary to authorize the client to post and/or retrieve.\n\n" );
 	print( "NOTE: The OAuth protocol requires an accurate system clock. If your clock is too far off from Twitter's clock, authorization might fail, either consistently or intermittently. If you're having a problem like this, please try syncing your clock to an NTP server.\n\n" );
 	print( "Report bugs to <pdbogen-twipper\@cernu.us>\n" );
-	print( "twipper  Copyright (C) 2013-2014 Patrick Bogen\n" );
+	print( "twipper  Copyright (C) 2013-2019 Patrick Bogen\n" );
 	print( "This program comes with ABSOLUTELY NO WARRANTY; see COPYING for details. This is free software, and you are welcome to redistribute it under certain conditions; see COPYING for details.\n" );
 	exit 0;
 }

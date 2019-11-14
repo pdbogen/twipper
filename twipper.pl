@@ -264,6 +264,8 @@ sub validateGo {
 
 	$text = 1 if (!defined $text || $text eq "");
 	return 0 unless $text =~ m/^[0-9]+$/;
+	print( STDERR "validateGo: looking for URL # $text" ) if $verbose;
+
 	if( $text == 0 || ( !exists( $urls[0] ) && $text == 1 ) ) {
 		$tweetLabel = "GO to tweet";
 		return 1;
@@ -294,7 +296,11 @@ sub tweetGo {
 	# This doesn't always fail for validateGo, but should fail here
 	my $url;
 	if( $text == 0 || ( !exists( $urls[ 0 ] ) && $text == 1 ) ) {
-		$url = "https://twitter.com/".$tweet->{ "user" }->{ "screen_name" }."/status/".$tweet->{ "id" };
+		if (defined $tweet->{ "quoted_status_permalink" }) {
+			$url = $tweet->{ "quoted_status_permalink" }->{ "expanded" };
+		} else {
+			$url = "https://twitter.com/".$tweet->{ "user" }->{ "screen_name" }."/status/".$tweet->{ "id" };
+		}
 	} elsif( exists( $urls[ $text - 1 ] ) ) {
 		$url = $urls[ $text - 1 ]->{ "url" };
 	} else {
@@ -940,6 +946,19 @@ sub fetch {
 		} else {
 			$delta = sprintf( "%2ds", $date[3] );
 		}
+		if ($tweet->{ 'is_quote_status' } && defined $tweet->{ 'retweeted_status' }) {
+			print( STDERR "retweeted_status.full_text is " . $tweet->{ 'retweeted_status' }->{ 'full_text' } ) if $verbose;
+			$tweet->{ 'full_text' } =
+				'RT @' .
+				$tweet->{ 'retweeted_status' }->{ 'user' }->{ 'screen_name' } .
+				$tweet->{ 'retweeted_status' }->{ 'full_text' } .
+				' // quote @' .
+				$tweet->{ 'retweeted_status' }->{ 'quoted_status' }->{ 'user' }->{ 'screen_name' } .
+				' '
+				$tweet->{ 'retweeted_status' }->{ 'quoted_status' }->{ 'full_text' };
+		} elsif ($tweet->{ 'is_quote_status' } && defined $tweet->{ 'quoted_status' }) {
+			$tweet->{ 'full_text' } .= ' // quote @' . $tweet->{ 'quoted_status' }->{ 'user' }->{ 'screen_name' } . ' ' . $tweet->{ 'quoted_status' }->{ 'full_text' };
+		}
 		$tweet->{ 'full_text' } =~ s/&lt;/</gi;
 		$tweet->{ 'full_text' } =~ s/&gt;/>/gi;
 		$tweet->{ 'full_text' } =~ s/&amp;/&/gi;
@@ -1125,3 +1144,5 @@ sub refreshTweet {
 	}
 	return $response->code();
 }
+
+# vim: set noexpandtab:

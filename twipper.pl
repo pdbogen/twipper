@@ -954,7 +954,7 @@ sub fetch {
 				$tweet->{ 'retweeted_status' }->{ 'full_text' } .
 				' // quote @' .
 				$tweet->{ 'retweeted_status' }->{ 'quoted_status' }->{ 'user' }->{ 'screen_name' } .
-				' '
+				' ' .
 				$tweet->{ 'retweeted_status' }->{ 'quoted_status' }->{ 'full_text' };
 		} elsif ($tweet->{ 'is_quote_status' } && defined $tweet->{ 'quoted_status' }) {
 			$tweet->{ 'full_text' } .= ' // quote @' . $tweet->{ 'quoted_status' }->{ 'user' }->{ 'screen_name' } . ' ' . $tweet->{ 'quoted_status' }->{ 'full_text' };

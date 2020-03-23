@@ -248,36 +248,57 @@ sub clearFromGUI {
 	}
 }
 
+sub urlsForTweet {
+	my $tweet = shift;
+	return () unless defined $tweet;
+
+	if (defined $tweet->{ 'retweeted_status' }) {
+		$tweet = $tweet->{ 'retweeted_status' };
+	}
+
+	my @urls = (
+		{
+			"display_url" => "tweet",
+			"url" => "https://twitter.com/".$tweet->{ "user" }->{ "screen_name" }."/status/".$tweet->{ "id_str" },
+		},
+		@{$tweet->{ "entities" }->{ "urls" }},
+		grep { exists $_->{ "url" } } @{$tweet->{ "entities" }->{ "media" }},
+	);
+}
+
 sub validateGo {
 	my $content = shift;
 	my( $cmd, $num, $text ) = split( / /, $content, 3 );
 	$tweetLabel = "GO ...";
 
 	# validate overall format
-	return 0 unless $content =~ m!/go [0-9]*( [0-9]*)?$!i;
+	if ($content !~ m!/go [0-9]*( [0-9]*)?$!i) {
+	  print( "proposed /go syntax $content is invalid\n" ) if $verbose;
+		return 0;
+	}
 
 	# validate tweet #
-	return 1 if $num eq "";
-	my $tweet = numToTweet( id => $num );
-	if (defined $tweet->{ 'retweeted_status' }) {
-		$tweet = $tweet->{ 'retweeted_status' };
+	if ($num eq "") {
+		print( "/go: blank num treated as always valid\n" ) if $verbose;
+		return 1;
 	}
-	my @urls = ( @{$tweet->{ "entities" }->{ "urls" }}, grep { exists $_->{ "url" } } @{$tweet->{ "entities" }->{ "media" }} );
-	return 0 unless defined $tweet;
 
-	$text = 1 if (!defined $text || $text eq "");
-	return 0 unless $text =~ m/^[0-9]+$/;
+	my $tweet = numToTweet( id => $num );
+	my @urls = urlsForTweet($tweet);
+
+	$text = 0 if (!defined $text || $text eq "");
+	if ($text !~ m/^[0-9]+$/) {
+		print( "/go argument $text is invalid\n") if $verbose;
+		return 0;
+	}
 	print( STDERR "validateGo: looking for URL # $text\n" ) if $verbose;
 
-	if( $text == 0 || ( !exists( $urls[0] ) && $text == 1 ) ) {
-		$tweetLabel = "GO to tweet";
-		return 1;
-	} elsif( exists $urls[ $text - 1 ] ) {
-		my $url = $urls[ $text - 1 ];
-		my( $domain ) = split( '/', $url->{ "display_url" }, 2 );
-		$tweetLabel = $domain;
+	if( exists $urls[ $text ] ) {
+		$tweetLabel = (split( '/', $urls[ $text ]->{ "display_url" }, 2 ))[0];
+		print( "/go: tweet $num url $text is " . $urls[ $text ]->{ "url" } . "\n" ) if $verbose;
 		return 1;
 	} else {
+		print( "/go: tweet $num has no url $text\n" ) if $verbose;
 		return 0;
 	}
 }
@@ -287,24 +308,19 @@ sub tweetGo {
 
 	# Parse command
 	my( $cmd, $num, $text ) = split( / /, $content, 3 );
-	$text = 1 if (!defined $text || $text eq "");
+	$text = 0 if (!defined $text || $text eq "");
 
 	# Make sure validation is consistent
 	return 0 unless validateGo( $content );
 
 	# Locate tweet, parse URLs out (embedded URLs + media)
 	my $tweet = numToTweet( id => $num );
-	if (defined $tweet->{ 'retweeted_status' }) {
-		$tweet = $tweet->{ 'retweeted_status' };
-	}
-	my @urls = ( @{$tweet->{ "entities" }->{ "urls" }}, grep { exists $_->{ "url" } } @{$tweet->{ "entities" }->{ "media" }} );
+	my @urls = urlsForTweet($tweet);
 
 	# This doesn't always fail for validateGo, but should fail here
 	my $url;
-	if( $text == 0 || ( !exists( $urls[ 0 ] ) && $text == 1 ) ) {
-		$url = "https://twitter.com/".$tweet->{ "user" }->{ "screen_name" }."/status/".$tweet->{ "id" };
-	} elsif( exists( $urls[ $text - 1 ] ) ) {
-		$url = $urls[ $text - 1 ]->{ "url" };
+	if( exists( $urls[ $text ] ) ) {
+		$url = $urls[ $text ]->{ "url" };
 	} else {
 		return 0;
 	}

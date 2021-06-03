@@ -552,9 +552,12 @@ sub tweetReply {
 
 sub validateFromGUI {
 	my $content = shift;
-	if( $content =~ m!^/([a-z]+) (.*)$!i ) {
+	if( $content =~ m!^/(\S+) (.*)$!i ) {
 		if( exists( $commands{ $1 } ) ) {
 			return ($commands{ $1 }->[0])->( $content );
+		} else {
+			$tweetLabel = "bad command $1";
+			return 0;
 		}
 	}
 
@@ -587,15 +590,18 @@ sub calculateLength {
 
 sub tweetFromGUI {
 	my $content = $tweetVar;
-	if( $content =~ m!^/([a-z]+) (.*)$!i ) {
+	if( $content =~ m!^/([a-z]+) ?(.*)$!i ) {
+		# this is a / command
 		if( exists( $commands{ $1 } ) ) {
+			# it's a valid slash command; run it
 			if( ($commands{ $1 }->[1])->( $content ) ) {
+				# it worked!
 				exit(0) if $oneshot;
 				return 1;
-			} else {
-				return 0;
 			}
 		}
+		# invalid or failed slash command, report failure
+		return 0;
 	}
 
 	if( length( $tweetVar ) > 0 ) {
